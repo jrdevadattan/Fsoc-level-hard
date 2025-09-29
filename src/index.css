@@ -1,0 +1,26 @@
+/* Simple styles for our quiz app */
+
+/* Reset some default browser styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Basic body styling */
+body {
+  font-family: Arial, sans-serif;
+  line-height: 1.6;
+  color: #333;
+  background-color: #f0f0f0;
+}
+
+/* Make buttons look nicer when you hover over them */
+button:hover {
+  opacity: 0.9;
+}
+
+/* Make sure buttons have a pointer cursor */
+button {
+  cursor: pointer;
+}
