@@ -22,6 +22,10 @@ This is a React-based quiz application built with Vite, Tailwind CSS, and the Op
 - npm or yarn
 - Git
 
+
+[![Video Title](https://img.youtube.com/vi/citgkZs8xMk/maxresdefault.jpg)](https://www.youtube.com/watch?v=citgkZs8xMk)
+
+
 ### Local Setup
 1. **Clone the repository**:
    ```bash
