@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react"
 
 export default function KeyboardShortcuts() {
   const focusedIndexRef = useRef(-1)
-  const [showHelp, setShowHelp] = useState(false)
+  const [showHelp, setShowHelp] = useState(true)
 
   // Get all interactive answer buttons for the current question
   const getAnswerButtons = () => {
