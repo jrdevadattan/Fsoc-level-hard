@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrophy } from "@fortawesome/free-solid-svg-icons";
+import { faTrophy, faCog } from "@fortawesome/free-solid-svg-icons";
 
 const QuizSetupPage = ({ onStart }) => {
   const [numQuestions, setNumQuestions] = useState(10);
-  const [category, setCategory] = useState(null); // { id, name }
+  const [category, setCategory] = useState(null);
   const [difficulty, setDifficulty] = useState("Easy");
-  const [questionType, setQuestionType] = useState("multiple"); // API values: multiple/boolean
+  const [questionType, setQuestionType] = useState("multiple");
   const [categories, setCategories] = useState([]);
   const [questionTypes, setQuestionTypes] = useState([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
@@ -18,11 +18,8 @@ const QuizSetupPage = ({ onStart }) => {
 
   const difficultyOptions = ["Easy", "Medium", "Hard"];
 
-  // Fetch categories from API
   useEffect(() => {
     const fetchCategories = async () => {
-      setLoadingCategories(true);
-      setError(null);
       try {
         const res = await fetch("https://opentdb.com/api_category.php");
         if (!res.ok) throw new Error("Failed to fetch categories");
@@ -43,52 +40,51 @@ const QuizSetupPage = ({ onStart }) => {
     fetchCategories();
   }, []);
 
-  // Initialize question types
   useEffect(() => {
     setLoadingTypes(true);
-    try {
-      const types = [
-        { value: "multiple", label: "Multiple Choice" },
-        { value: "boolean", label: "True/False" },
-      ];
-      setQuestionTypes(types);
-      setQuestionType(types[0].value);
-    } catch (err) {
-      console.error("Failed to set question types", err);
-    } finally {
-      setLoadingTypes(false);
-    }
+    const types = [
+      { value: "multiple", label: "Multiple Choice" },
+      { value: "boolean", label: "True/False" },
+    ];
+    setQuestionTypes(types);
+    setQuestionType(types[0].value);
+    setLoadingTypes(false);
   }, []);
 
-  // Start quiz and save preferences
   const handleStartQuiz = () => {
     const preferences = { numQuestions, category, difficulty, questionType };
     localStorage.setItem("quizPreferences", JSON.stringify(preferences));
-    console.log("Quiz started with config:", preferences);
-
-    if (typeof onStart === "function") {
-      onStart(); // tells QuizApp to start quiz
-    } else {
-      navigate("/"); // fallback
-    }
+    if (typeof onStart === "function") onStart();
+    else navigate("/");
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gray-900">
-      <div className="w-full max-w-6xl">
-        <div className="bg-gray-800 border border-gray-700 rounded-2xl p-8 mb-6 text-white">
+    <div className="h-screen w-screen flex items-center justify-center bg-gradient-to-br from-purple-600 to-blue-600 overflow-hidden">
+  <div className="w-full max-w-3xl">
+    <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-8 shadow-xl">
           {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-semibold mb-2">Quiz Setup</h1>
-            <p className="text-gray-400 text-sm">
-              Configure your quiz preferences and start playing
-            </p>
+          <div className="flex items-center justify-center gap-2 mb-8">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-8 h-8 text-white relative top-[2px]"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+            >
+              <path d="M19.43 12.98c.04-.32.07-.66.07-1s-.03-.68-.07-1l2.11-1.65a.5.5 0 00.11-.64l-2-3.46a.5.5 0 00-.61-.22l-2.49 1a7.03 7.03 0 00-1.73-1l-.38-2.65A.495.495 0 0014 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.63.27-1.21.61-1.73 1l-2.49-1a.5.5 0 00-.61.22l-2 3.46c-.14.23-.1.54.11.64L4.57 11c-.04.32-.07.66-.07 1s.03.68.07 1l-2.11 1.65a.5.5 0 00-.11.64l2 3.46c.14.23.41.3.61.22l2.49-1c.52.39 1.1.73 1.73 1l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.63-.27 1.21-.61 1.73-1l2.49 1c.2.08.47.01.61-.22l2-3.46a.5.5 0 00-.11-.64L19.43 12.98zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z" />
+            </svg>
+            <h1 className="text-3xl font-semibold text-white tracking-wide">
+              Quiz Setup
+            </h1>
           </div>
+          <p className="text-center text-purple-100 mb-10">
+            Configure your quiz preferences and get started!
+          </p>
 
           {/* Number of Questions */}
           <div className="mb-6">
-            <label className="block font-medium mb-3">
-              Number of Questions: {numQuestions}
+            <label className="block text-white font-medium mb-3">
+              Number of Questions:{" "}
+              <span className="text-yellow-300">{numQuestions}</span>
             </label>
             <RangeSlider
               value={numQuestions}
@@ -100,11 +96,13 @@ const QuizSetupPage = ({ onStart }) => {
 
           {/* Category */}
           <div className="mb-6">
-            <label className="block font-medium mb-3">Category</label>
+            <label className="block text-white font-medium mb-3">
+              Category
+            </label>
             {loadingCategories ? (
-              <div className="text-gray-400">Loading categories...</div>
+              <div className="text-purple-200">Loading categories...</div>
             ) : error ? (
-              <div className="text-red-500">{error}</div>
+              <div className="text-red-400">{error}</div>
             ) : (
               <Dropdown
                 id="category"
@@ -120,7 +118,9 @@ const QuizSetupPage = ({ onStart }) => {
 
           {/* Difficulty */}
           <div className="mb-6">
-            <label className="block font-medium mb-3">Difficulty</label>
+            <label className="block text-white font-medium mb-3">
+              Difficulty
+            </label>
             <Dropdown
               id="difficulty"
               value={difficulty}
@@ -133,9 +133,11 @@ const QuizSetupPage = ({ onStart }) => {
 
           {/* Question Type */}
           <div className="mb-8">
-            <label className="block font-medium mb-3">Question Type</label>
+            <label className="block text-white font-medium mb-3">
+              Question Type
+            </label>
             {loadingTypes ? (
-              <div className="text-gray-400">Loading question types...</div>
+              <div className="text-purple-200">Loading question types...</div>
             ) : (
               <Dropdown
                 id="type"
@@ -160,10 +162,10 @@ const QuizSetupPage = ({ onStart }) => {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-3 mb-6">
+          <div className="flex gap-4 mb-6">
             <button
               onClick={handleStartQuiz}
-              className="flex-1 bg-gradient-to-r from-purple-600 to-purple-800 py-4 rounded-xl font-medium flex items-center justify-center hover:opacity-90 transition-opacity"
+              className="flex-1 bg-gradient-to-r from-yellow-400 to-orange-500 py-4 rounded-xl font-semibold text-black flex items-center justify-center shadow-lg hover:scale-105 transition-transform"
             >
               <svg
                 className="w-5 h-5 mr-2"
@@ -175,12 +177,12 @@ const QuizSetupPage = ({ onStart }) => {
               Start Quiz
             </button>
 
-            <button className="bg-gray-700 text-white py-4 px-12 rounded-xl flex items-center justify-center hover:bg-gray-600 transition-colors">
+            <button className="bg-gradient-to-r from-purple-500 to-indigo-600 py-4 px-12 rounded-xl text-white flex items-center justify-center shadow-md hover:scale-105 transition-transform">
               <FontAwesomeIcon icon={faTrophy} className="w-6 h-6" />
             </button>
           </div>
 
-          {/* Preview of selected settings */}
+          {/* Quick Settings */}
           <QuickSettings
             numQuestions={numQuestions}
             category={category}
@@ -193,7 +195,7 @@ const QuizSetupPage = ({ onStart }) => {
   );
 };
 
-/* ===== Sub-components ===== */
+/* Sub-components */
 const RangeSlider = ({ value, onChange, min, max }) => {
   const percentage = ((value - min) / (max - min)) * 100;
   return (
@@ -204,12 +206,12 @@ const RangeSlider = ({ value, onChange, min, max }) => {
         max={max}
         value={value}
         onChange={(e) => onChange(parseInt(e.target.value))}
-        className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+        className="w-full h-2 rounded-lg appearance-none cursor-pointer slider"
         style={{
-          background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${percentage}%, #3a4553 ${percentage}%, #3a4553 100%)`,
+          background: `linear-gradient(to right, #facc15 0%, #facc15 ${percentage}%, #4b5563 ${percentage}%, #4b5563 100%)`,
         }}
       />
-      <div className="flex justify-between text-xs text-gray-400 mt-2">
+      <div className="flex justify-between text-xs text-purple-200 mt-2">
         <span>{min}</span>
         <span>{max}</span>
       </div>
@@ -221,7 +223,7 @@ const RangeSlider = ({ value, onChange, min, max }) => {
           width: 20px;
           border-radius: 50%;
           background: black;
-          border: 3px solid #8b5cf6;
+          border: 3px solid #facc15;
           cursor: pointer;
         }
         .slider::-moz-range-thumb {
@@ -229,7 +231,7 @@ const RangeSlider = ({ value, onChange, min, max }) => {
           width: 20px;
           border-radius: 50%;
           background: black;
-          border: 3px solid #8b5cf6;
+          border: 3px solid #facc15;
           cursor: pointer;
         }
       `}</style>
@@ -251,9 +253,9 @@ const Dropdown = ({
     <div className="relative">
       <button
         onClick={() => setOpenDropdown(isOpen ? null : id)}
-        className="w-full bg-gray-700 px-4 py-3 rounded-xl text-left flex items-center justify-between hover:bg-opacity-80 transition-colors"
+        className="w-full bg-white/20 px-4 py-3 rounded-xl text-left flex items-center justify-between text-white hover:bg-white/30 transition"
       >
-        <span>{value}</span>
+        <span>{value || "Select..."}</span>
         <svg
           className={`w-5 h-5 transition-transform ${
             isOpen ? "rotate-180" : ""
@@ -266,7 +268,7 @@ const Dropdown = ({
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-gray-700 border border-gray-700 rounded-xl shadow-lg z-10 max-h-64 overflow-y-auto">
+        <div className="absolute top-full left-0 right-0 mt-2 bg-white text-black rounded-xl shadow-xl z-10 max-h-64 overflow-y-auto">
           {options.map((option, index) => {
             const label = renderLabel
               ? renderLabel(option)
@@ -280,7 +282,7 @@ const Dropdown = ({
                   onChange(option);
                   setOpenDropdown(null);
                 }}
-                className="w-full text-left px-4 py-3 hover:bg-gray-800 transition-colors first:rounded-t-xl last:rounded-b-xl"
+                className="w-full text-left px-4 py-3 hover:bg-purple-100 transition"
               >
                 {label}
               </button>
@@ -292,48 +294,63 @@ const Dropdown = ({
   );
 };
 
-const QuickSettings = ({ numQuestions, category, difficulty, questionType }) => {
+const QuickSettings = ({
+  numQuestions,
+  category,
+  difficulty,
+  questionType,
+}) => {
   const getDifficultyColor = (diff) => {
     switch (diff) {
       case "Easy":
-        return "text-green-400";
+        return "text-green-400 font-extrabold";
       case "Medium":
-        return "text-yellow-400";
+        return "text-yellow-400 font-extrabold";
       case "Hard":
-        return "text-red-400";
+        return "text-red-500 font-extrabold";
       default:
-        return "text-white";
+        return "text-white font-extrabold";
     }
   };
 
-  const getShortType = (type) => (type === "multiple" ? "MC" : type === "boolean" ? "TF" : "MX");
+  const getShortType = (type) => (type === "multiple" ? "MC" : "TF");
 
   return (
     <div className="w-full flex justify-center">
       <div className="grid grid-cols-5 gap-3 w-full max-w-5xl">
-        {/* Number of Questions */}
-        <div className="bg-gray-700 border border-gray-600 rounded-xl p-4 text-center flex flex-col items-center justify-center">
-          <div className="text-2xl font-bold text-purple-400 mb-1">{numQuestions}</div>
-          <div className="text-xs text-gray-300">Questions</div>
+
+        {/* Questions */}
+        <div className="bg-white/10 border border-white/20 rounded-xl p-4 text-center">
+          <div className="text-2xl font-extrabold text-yellow-400">
+            {numQuestions}
+          </div>
+          <div className="text-sm font-semibold text-gray-100">Questions</div>
         </div>
 
-        {/* Category (full name, spans 2 columns) */}
-        <div className="col-span-2 bg-gray-700 border border-gray-600 rounded-xl p-4 text-center flex flex-col items-center justify-center">
-          <div className="text-2xl font-bold text-blue-400 mb-1">{category?.name || ""}</div>
-          <div className="text-xs text-gray-300">Category</div>
+        {/* Category */}
+        <div className="col-span-2 bg-white/10 border border-white/20 rounded-xl p-4 text-center">
+          <div className="text-lg font-bold text-amber-300">
+            {category?.name || ""}
+          </div>
+          <div className="text-sm font-semibold text-gray-100">Category</div>
         </div>
 
         {/* Difficulty */}
-        <div className="bg-gray-700 border border-gray-600 rounded-xl p-4 text-center flex flex-col items-center justify-center">
-          <div className={`text-2xl font-bold mb-1 ${getDifficultyColor(difficulty)}`}>{difficulty}</div>
-          <div className="text-xs text-gray-300">Difficulty</div>
+        <div className="bg-white/10 border border-white/20 rounded-xl p-4 text-center">
+          <div className={`text-lg ${getDifficultyColor(difficulty)}`}>
+            {difficulty}
+          </div>
+          <div className="text-sm font-semibold text-gray-100">Difficulty</div>
         </div>
 
-        {/* Question Type */}
-        <div className="bg-gray-700 border border-gray-600 rounded-xl p-4 text-center flex flex-col items-center justify-center">
-          <div className="text-2xl font-bold text-cyan-400 mb-1">{getShortType(questionType)}</div>
-          <div className="text-xs text-gray-300">Type</div>
+        {/* Type */}
+        <div className="bg-white/10 border border-white/20 rounded-xl p-4 text-center">
+          <div className="text-lg font-bold text-green-300">
+            {getShortType(questionType)}
+          </div>
+          <div className="text-sm font-semibold text-gray-100">Type</div>
         </div>
+
       </div>
     </div>
   );
