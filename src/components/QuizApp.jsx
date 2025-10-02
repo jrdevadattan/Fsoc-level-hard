@@ -195,6 +195,22 @@ const QuizApp = () => {
         }
     }, [isTimerEnabled, timerDuration]);
 
+    // Function to handle going back to setup with proper cleanup
+    const handleBackToSetup = useCallback(() => {
+        QuizStateManager.clearQuizState();
+        setQuestions([]);
+        setCurrentQuestionIndex(0);
+        setSelectedAnswers([]);
+        setQuizCompleted(false);
+        setScore(0);
+        setError(null);
+        setIsQuizPaused(false);
+        setIsTimerPaused(false);
+        setTimeRemaining(null);
+        setQuizStartTime(null);
+        setShowSetup(true);
+    }, []);
+
     // load questions after user finishes setup
     useEffect(() => {
         if (!showSetup) {
@@ -311,12 +327,20 @@ const QuizApp = () => {
                         Oops! Something went wrong
                     </h2>
                     <p className="text-gray-600 mb-6">{error}</p>
-                    <button
-                        onClick={fetchQuestions}
-                        className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200"
-                    >
-                        Try Again
-                    </button>
+                    <div className="space-y-3">
+                        <button
+                            onClick={fetchQuestions}
+                            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200"
+                        >
+                            Try Again
+                        </button>
+                        <button
+                            onClick={handleBackToSetup}
+                            className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-black font-bold py-3 px-6 rounded-lg transition-all duration-200"
+                        >
+                            ⚙️ Back to Setup
+                        </button>
+                    </div>
                 </div>
             </div>
         );
@@ -330,6 +354,7 @@ const QuizApp = () => {
                     score={score}
                     totalQuestions={questions.length}
                     onRestart={restartQuiz}
+                    onBackToSetup={handleBackToSetup}
                 />
             </>
         );
@@ -349,16 +374,45 @@ const QuizApp = () => {
                 totalQuestions={questions.length}
                 timeRemaining={timeRemaining}
                 score={score}
+                onBackToSetup={handleBackToSetup}
             />
 
             <div className="max-w-4xl mx-auto pt-4">
                 <div className="text-center mb-8 relative">
-                    <div className="absolute top-0 left-0">
+                    <div className="absolute top-0 left-0 flex gap-2">
                         <PauseButton
                             isPaused={isQuizPaused}
                             onTogglePause={handlePauseToggle}
                             disabled={quizCompleted}
                         />
+                        <button
+                            onClick={() => {
+                                if (
+                                    window.confirm(
+                                        "Are you sure you want to go back to setup? Your current progress will be lost.",
+                                    )
+                                ) {
+                                    handleBackToSetup();
+                                }
+                            }}
+                            className="bg-white/20 hover:bg-white/30 text-white p-3 rounded-lg transition-colors flex items-center gap-2 border border-white/30"
+                            title="Back to Setup"
+                        >
+                            <svg
+                                className="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M15 19l-7-7 7-7"
+                                />
+                            </svg>
+                            Setup
+                        </button>
                     </div>
 
                     <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">

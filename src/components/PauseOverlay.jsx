@@ -8,6 +8,7 @@ const PauseOverlay = ({
     totalQuestions,
     timeRemaining,
     score,
+    onBackToSetup,
 }) => {
     // Prevent scrolling when overlay is visible
     useEffect(() => {
@@ -117,20 +118,45 @@ const PauseOverlay = ({
                     )}
                 </div>
 
-                {/* Resume Button */}
-                <button
-                    onClick={onResume}
-                    className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700
-                   text-white font-bold py-4 px-6 rounded-lg
-                   transition-all duration-300 transform hover:scale-105
-                   focus:outline-none focus:ring-4 focus:ring-green-300
-                   shadow-lg hover:shadow-xl
-                   flex items-center justify-center gap-3"
-                    autoFocus
-                >
-                    <FaPlay className="text-lg" />
-                    <span className="text-lg">Resume Quiz</span>
-                </button>
+                {/* Action Buttons */}
+                <div className="space-y-3">
+                    <button
+                        onClick={onResume}
+                        className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700
+                       text-white font-bold py-4 px-6 rounded-lg
+                       transition-all duration-300 transform hover:scale-105
+                       focus:outline-none focus:ring-4 focus:ring-green-300
+                       shadow-lg hover:shadow-xl
+                       flex items-center justify-center gap-3"
+                        autoFocus
+                    >
+                        <FaPlay className="text-lg" />
+                        <span className="text-lg">Resume Quiz</span>
+                    </button>
+
+                    {onBackToSetup && (
+                        <button
+                            onClick={() => {
+                                if (
+                                    window.confirm(
+                                        "Are you sure you want to go back to setup? Your current progress will be lost.",
+                                    )
+                                ) {
+                                    onBackToSetup();
+                                }
+                            }}
+                            className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600
+                           text-black font-bold py-3 px-6 rounded-lg
+                           transition-all duration-300 transform hover:scale-105
+                           focus:outline-none focus:ring-4 focus:ring-yellow-300
+                           shadow-lg hover:shadow-xl
+                           flex items-center justify-center gap-3"
+                        >
+                            <span className="text-lg">⚙️</span>
+                            <span className="text-lg">Back to Setup</span>
+                        </button>
+                    )}
+                </div>
 
                 {/* Keyboard Hint */}
                 <p className="text-sm text-gray-500 mt-4">
