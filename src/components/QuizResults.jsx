@@ -1,55 +1,60 @@
-const QuizResults = ({ score, totalQuestions, onRestart }) => {
-  const percentage = Math.round((score / totalQuestions) * 100);
-  
-  const getResultMessage = () => {
-    if (percentage >= 90) return { message: "Outstanding! 🏆", emoji: "🎯", color: "text-yellow-600" };
-    if (percentage >= 80) return { message: "Excellent! 🌟", emoji: "⭐", color: "text-green-600" };
-    if (percentage >= 70) return { message: "Great Job! 👏", emoji: "👍", color: "text-blue-600" };
-    if (percentage >= 50) return { message: "Good Effort! 💪", emoji: "👌", color: "text-purple-600" };
-    return { message: "Keep Trying! 📚", emoji: "💪", color: "text-red-600" };
-  };
+"use client"
 
-  const result = getResultMessage();
+const QuizResults = ({ score, totalQuestions, onRestart }) => {
+  const percentage = Math.round((score / totalQuestions) * 100)
+
+  const getResultMessage = () => {
+    if (percentage >= 90)
+      return {
+        message: "Outstanding! 🏆",
+        emoji: "🎯",
+        color: "text-yellow-600",
+      }
+    if (percentage >= 80)
+      return {
+        message: "Excellent! 🌟",
+        emoji: "⭐",
+        color: "text-green-600",
+      }
+    if (percentage >= 70)
+      return {
+        message: "Great Job! 👏",
+        emoji: "👍",
+        color: "text-blue-600",
+      }
+    if (percentage >= 50)
+      return {
+        message: "Good Effort! 💪",
+        emoji: "👌",
+        color: "text-purple-600",
+      }
+    return {
+      message: "Keep Trying! 📚",
+      emoji: "💪",
+      color: "text-red-600",
+    }
+  }
+
+  const result = getResultMessage()
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center transform animate-pulse">
-        {/* Celebration Animation */}
-        <div className="text-8xl mb-6 animate-bounce">
-          {result.emoji}
-        </div>
+        <div className="text-8xl mb-6 animate-bounce">{result.emoji}</div>
 
-        {/* Results Header */}
-        <h2 className="text-3xl font-bold text-gray-800 mb-2">
-          Quiz Complete!
-        </h2>
-        
-        <p className={`text-2xl font-semibold mb-6 ${result.color}`}>
-          {result.message}
-        </p>
+        <h2 className="text-3xl font-bold text-gray-800 mb-2">Quiz Complete!</h2>
 
-        {/* Score Display */}
+        <p className={`text-2xl font-semibold mb-6 ${result.color}`}>{result.message}</p>
+
         <div className="bg-gray-50 rounded-xl p-6 mb-8">
           <div className="text-6xl font-bold text-gray-800 mb-2">
             {score}/{totalQuestions}
           </div>
-          <div className="text-xl text-gray-600 mb-4">
-            {percentage}% Correct
-          </div>
-          
-          {/* Progress Ring */}
+          <div className="text-xl text-gray-600 mb-4">{percentage}% Correct</div>
+
           <div className="relative w-32 h-32 mx-auto mb-4">
             <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 120 120">
-              {/* Background Circle */}
-              <circle
-                cx="60"
-                cy="60"
-                r="50"
-                fill="none"
-                stroke="#e5e7eb"
-                strokeWidth="8"
-              />
-              {/* Progress Circle */}
+              <circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" strokeWidth="8" />
               <circle
                 cx="60"
                 cy="60"
@@ -68,7 +73,6 @@ const QuizResults = ({ score, totalQuestions, onRestart }) => {
           </div>
         </div>
 
-        {/* Performance Breakdown */}
         <div className="grid grid-cols-2 gap-4 mb-8">
           <div className="bg-green-50 p-4 rounded-lg">
             <div className="text-2xl font-bold text-green-600">{score}</div>
@@ -80,33 +84,30 @@ const QuizResults = ({ score, totalQuestions, onRestart }) => {
           </div>
         </div>
 
-        {/* Action Buttons */}
         <div className="space-y-3">
           <button
             onClick={onRestart}
             className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold py-4 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg"
+            data-quiz-restart="true"
           >
             🔄 Try Again
           </button>
-          
+
           <button
-            onClick={() => window.open('https://opentdb.com/', '_blank')}
+            onClick={() => window.open("https://opentdb.com/", "_blank")}
             className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-3 px-6 rounded-lg transition-colors duration-200"
           >
             🌐 More Quizzes
           </button>
         </div>
 
-        {/* Share Results */}
         <div className="mt-6">
           <p className="text-sm text-gray-500 mb-3">Share your results:</p>
-          <button>
-            📱 Share Score
-          </button>
+          <button>📱 Share Score</button>
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default QuizResults;
+export default QuizResults
