@@ -8,7 +8,6 @@ import QuizSetupPage from "./QuizSetupPage";
 import CountdownTimer from "./CountdownTimer";
 import TimerSettings from "./TimerSettings";
 import KeyboardShortcuts from "./KeyboardShortcuts";
-import PauseButton from "./PauseButton";
 import PauseOverlay from "./PauseOverlay";
 import QuizStateManager from "../utils/QuizStateManager";
 import BookmarkManager from "../utils/BookmarkManager";
@@ -379,12 +378,7 @@ const QuizApp = () => {
 
             <div className="max-w-4xl mx-auto pt-4">
                 <div className="text-center mb-8 relative">
-                    <div className="absolute top-0 left-0 flex gap-2">
-                        <PauseButton
-                            isPaused={isQuizPaused}
-                            onTogglePause={handlePauseToggle}
-                            disabled={quizCompleted}
-                        />
+                    <div className="absolute top-0 left-0">
                         <button
                             onClick={() => {
                                 if (
@@ -423,7 +417,30 @@ const QuizApp = () => {
                         {selectedCategory || "this topic"} questions!
                     </p>
 
-                    <div className="absolute top-0 right-0">
+                    <div className="absolute top-0 right-0 flex gap-2">
+                        <button
+                            onClick={handlePauseToggle}
+                            disabled={quizCompleted}
+                            className={`
+                                flex items-center justify-center
+                                w-10 h-10 bg-white/20 hover:bg-white/30 text-white rounded-lg
+                                transition-all duration-200 backdrop-blur-sm border border-white/20 hover:border-white/40
+                                ${quizCompleted ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+                                touch-manipulation
+                            `}
+                            aria-label={
+                                isQuizPaused ? "Resume quiz" : "Pause quiz"
+                            }
+                            title={
+                                isQuizPaused
+                                    ? "Resume quiz (Spacebar)"
+                                    : "Pause quiz (Spacebar)"
+                            }
+                        >
+                            <span className="text-lg">
+                                {isQuizPaused ? "▶️" : "⏸️"}
+                            </span>
+                        </button>
                         <TimerSettings
                             currentDuration={timerDuration}
                             onDurationChange={setTimerDuration}
