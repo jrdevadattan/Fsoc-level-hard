@@ -1,3 +1,4 @@
+// CountdownTimer.jsx - Updated with voice integration
 import { useState, useEffect, useRef } from "react";
 
 const CountdownTimer = ({
@@ -13,10 +14,12 @@ const CountdownTimer = ({
     const [isRunning, setIsRunning] = useState(false);
     const intervalRef = useRef(null);
     const hasWarningFired = useRef(false);
+    const hasTimeUpFired = useRef(false);
 
     useEffect(() => {
         setTimeRemaining(duration);
         hasWarningFired.current = false;
+        hasTimeUpFired.current = false;
         if (isActive && !isPaused) {
             setIsRunning(true);
         }
@@ -47,9 +50,22 @@ const CountdownTimer = ({
 
                     if (newTime <= 0) {
                         setIsRunning(false);
-                        if (onTimeUp) {
-                            onTimeUp();
+                        
+                        // Call the timeout handler only once
+                        if (!hasTimeUpFired.current) {
+                            hasTimeUpFired.current = true;
+                            
+                            // Call the global handler for QuizQuestion
+                            if (typeof window !== 'undefined' && window.quizQuestionHandleTimeOut) {
+                                window.quizQuestionHandleTimeOut();
+                            }
+                            
+                            // Call the onTimeUp callback if provided
+                            if (onTimeUp) {
+                                onTimeUp();
+                            }
                         }
+                        
                         return 0;
                     }
 
@@ -141,6 +157,15 @@ const CountdownTimer = ({
                     ></div>
                 )}
             </div>
+
+            {/* Time's up indicator */}
+            {timeRemaining === 0 && (
+                <div className="mt-4 text-center">
+                    <span className="inline-block bg-red-500 text-white px-4 py-2 rounded-full font-bold text-sm animate-pulse">
+                        ⏱️ TIME'S UP!
+                    </span>
+                </div>
+            )}
         </div>
     );
 };
