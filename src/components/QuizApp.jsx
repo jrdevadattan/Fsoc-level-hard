@@ -10,44 +10,45 @@ import TimerSettings from "./TimerSettings";
 import KeyboardShortcuts from "./KeyboardShortcuts";
 
 const QuizApp = () => {
-  // core quiz state
+  // ---------- Core Quiz State ----------
   const [questions, setQuestions] = useState([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
   const [quizCompleted, setQuizCompleted] = useState(false);
   const [score, setScore] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  // setup state
+  // ---------- Quiz Setup State ----------
   const [showSetup, setShowSetup] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("");
 
-  // timer state
+  // ---------- Timer State ----------
   const [timerDuration, setTimerDuration] = useState(30);
   const [isTimerEnabled, setIsTimerEnabled] = useState(true);
   const [isTimerPaused, setIsTimerPaused] = useState(false);
 
+  // ---------- TTS / Result Announcement ----------
+  const [isResultAnnouncementComplete, setIsResultAnnouncementComplete] = useState(false);
+
+  // ---------- Helper to decode HTML entities ----------
   const decodeHtmlEntities = (text) => {
     const textarea = document.createElement("textarea");
     textarea.innerHTML = text;
     return textarea.value;
   };
 
+  // ---------- Fetch Questions from API ----------
   const fetchQuestions = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
 
-      // read preferences from localStorage (if any)
+      // Load stored preferences if available
       const prefRaw = localStorage.getItem("quizPreferences");
       let prefs = null;
       if (prefRaw) {
-        try {
-          prefs = JSON.parse(prefRaw);
-        } catch {
-          prefs = null;
-        }
+        try { prefs = JSON.parse(prefRaw); } catch { prefs = null; }
       }
 
       const amount = prefs?.numQuestions || 10;
@@ -70,24 +71,19 @@ const QuizApp = () => {
 
       const data = await response.json();
       if (data.response_code !== 0) {
-        throw new Error(
-          "No questions available for the selected options. Try changing the number/category/difficulty/type."
-        );
+        throw new Error("No questions available for the selected options.");
       }
 
-      // prepare questions: decode HTML and shuffle answers
-      const processedQuestions = data.results.map((question) => {
-        const answers = [
-          ...question.incorrect_answers,
-          question.correct_answer,
-        ];
-        const shuffledAnswers = answers.sort(() => Math.random() - 0.5);
+      // Decode HTML entities and shuffle answers
+      const processedQuestions = data.results.map((q) => {
+        const answers = [...q.incorrect_answers, q.correct_answer];
+        const shuffled = answers.sort(() => Math.random() - 0.5);
 
         return {
-          ...question,
-          question: decodeHtmlEntities(question.question),
-          correct_answer: decodeHtmlEntities(question.correct_answer),
-          answers: shuffledAnswers.map((a) => decodeHtmlEntities(a)),
+          ...q,
+          question: decodeHtmlEntities(q.question),
+          correct_answer: decodeHtmlEntities(q.correct_answer),
+          answers: shuffled.map((a) => decodeHtmlEntities(a)),
         };
       });
 
@@ -96,6 +92,7 @@ const QuizApp = () => {
       setSelectedAnswers([]);
       setQuizCompleted(false);
       setScore(0);
+      setIsResultAnnouncementComplete(false);
     } catch (err) {
       setError(err.message || "Unknown error");
     } finally {
@@ -103,13 +100,12 @@ const QuizApp = () => {
     }
   }, []);
 
-  // load questions after user finishes setup
+  // ---------- Load questions after setup ----------
   useEffect(() => {
-    if (!showSetup) {
-      fetchQuestions();
-    }
+    if (!showSetup) fetchQuestions();
   }, [showSetup, fetchQuestions]);
 
+  // ---------- Handle Answer Selection ----------
   const handleAnswerSelect = (selectedAnswer) => {
     const currentQuestion = questions[currentQuestionIndex];
     const isCorrect = selectedAnswer === currentQuestion?.correct_answer;
@@ -124,53 +120,56 @@ const QuizApp = () => {
     setSelectedAnswers((prev) => [...prev, answerData]);
     if (isCorrect) setScore((prev) => prev + 1);
 
-    // pause timer while moving to next
+    // Pause timer until next question
     setIsTimerPaused(true);
+    setIsResultAnnouncementComplete(false); // Reset for TTS
+  };
 
-    if (currentQuestionIndex < questions.length - 1) {
-      setTimeout(() => {
-        setCurrentQuestionIndex((prev) => prev + 1);
-        setIsTimerPaused(false);
-      }, 1000);
-    } else {
-      setTimeout(() => setQuizCompleted(true), 1000);
+  // ---------- Auto-advance to next question after TTS ----------
+  useEffect(() => {
+    if (isResultAnnouncementComplete && selectedAnswers[currentQuestionIndex]) {
+      const moveToNextQuestion = () => {
+        if (currentQuestionIndex < questions.length - 1) {
+          setCurrentQuestionIndex((prev) => prev + 1);
+          setIsTimerPaused(false);
+          setIsResultAnnouncementComplete(false); // reset for next question
+        } else {
+          setQuizCompleted(true);
+        }
+      };
+
+      setTimeout(moveToNextQuestion, 300); // slight delay for smooth transition
     }
-  };
+  }, [isResultAnnouncementComplete, currentQuestionIndex, questions.length, selectedAnswers]);
 
-  const handleTimerExpired = () => {
-    // treat expiration like selecting no answer
-    handleAnswerSelect(null);
-  };
+  // ---------- Timer Callbacks ----------
+  const handleTimerExpired = () => handleAnswerSelect(null);
+  const handleTimerWarning = () => console.log("Timer warning: 10 seconds remaining");
 
-  const handleTimerWarning = () => {
-    // optional: sound or visual warning
-    console.log("Timer warning: 10 seconds remaining");
-  };
+  // ---------- Called when TTS result announcement finishes ----------
+  const handleResultAnnounced = () => setIsResultAnnouncementComplete(true);
 
+  // ---------- Restart Quiz ----------
   const restartQuiz = () => {
     setCurrentQuestionIndex(0);
     setSelectedAnswers([]);
     setQuizCompleted(false);
     setScore(0);
     setIsTimerPaused(false);
+    setIsResultAnnouncementComplete(false);
     fetchQuestions();
   };
 
-  // show setup page until user starts quiz
-  if (showSetup) {
-    return <QuizSetupPage onStart={() => setShowSetup(false)} />;
-  }
-
+  // ---------- Render Logic ----------
+  if (showSetup) return <QuizSetupPage onStart={() => setShowSetup(false)} />;
   if (isLoading) return <LoadingSpinner />;
 
   if (error) {
     return (
-      <div className="h-screen overflow-hidden bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center p-4">
+      <div className="h-screen bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full text-center">
           <div className="text-red-500 text-6xl mb-4">⚠️</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">
-            Oops! Something went wrong
-          </h2>
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">Oops! Something went wrong</h2>
           <p className="text-gray-600 mb-6">{error}</p>
           <button
             onClick={fetchQuestions}
@@ -187,11 +186,7 @@ const QuizApp = () => {
     return (
       <>
         <KeyboardShortcuts />
-        <QuizResults
-          score={score}
-          totalQuestions={questions.length}
-          onRestart={restartQuiz}
-        />
+        <QuizResults score={score} totalQuestions={questions.length} onRestart={restartQuiz} />
       </>
     );
   }
@@ -200,15 +195,14 @@ const QuizApp = () => {
     <div className="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 p-4">
       <KeyboardShortcuts />
       <div className="max-w-4xl mx-auto">
+        {/* Header */}
         <div className="text-center mb-8 relative">
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">
-            Quiz Challenge
-          </h1>
+          <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">Quiz Challenge</h1>
           <p className="text-purple-200 text-lg">
-            Test your knowledge with {selectedCategory || "this topic"}{" "}
-            questions!
+            Test your knowledge with {selectedCategory || "this topic"} questions!
           </p>
 
+          {/* Timer settings in top-right corner */}
           <div className="absolute top-0 right-0">
             <TimerSettings
               currentDuration={timerDuration}
@@ -219,6 +213,7 @@ const QuizApp = () => {
           </div>
         </div>
 
+        {/* Progress Bar */}
         <div className="bg-white/20 rounded-full h-3 mb-8 overflow-hidden">
           <div
             className="bg-gradient-to-r from-pink-400 to-indigo-500 h-full rounded-full transition-all duration-500 ease-out"
@@ -232,36 +227,36 @@ const QuizApp = () => {
           ></div>
         </div>
 
-        <div className="mb-6">
-          {isTimerEnabled && timerDuration > 0 && (
-            <div className="mb-6">
-              <CountdownTimer
-                duration={timerDuration}
-                onTimeUp={handleTimerExpired}
-                isActive={!quizCompleted}
-                isPaused={isTimerPaused}
-                onWarning={handleTimerWarning}
-                showWarningAt={10}
-                key={`timer-${currentQuestionIndex}`}
-              />
-            </div>
-          )}
-
-          <div className="text-center">
-            <span className="bg-white/20 text-white px-4 py-2 rounded-full text-lg font-semibold">
-              Question {currentQuestionIndex + 1} of {questions.length || 0}
-            </span>
+        {/* Countdown Timer */}
+        {isTimerEnabled && timerDuration > 0 && (
+          <div className="mb-6">
+            <CountdownTimer
+              duration={timerDuration}
+              onTimeUp={handleTimerExpired}
+              isActive={!quizCompleted && !isTimerPaused}
+              isPaused={isTimerPaused}
+              onWarning={handleTimerWarning}
+              showWarningAt={10}
+              key={`timer-${currentQuestionIndex}`}
+            />
           </div>
+        )}
+
+        {/* Question Counter */}
+        <div className="text-center mb-6">
+          <span className="bg-white/20 text-white px-4 py-2 rounded-full text-lg font-semibold">
+            Question {currentQuestionIndex + 1} of {questions.length || 0}
+          </span>
         </div>
 
+        {/* Current Question */}
         {questions.length > 0 && (
           <QuizQuestion
             question={questions[currentQuestionIndex]}
             onAnswerSelect={handleAnswerSelect}
-            selectedAnswer={
-              selectedAnswers[currentQuestionIndex]?.selectedAnswer
-            }
+            selectedAnswer={selectedAnswers[currentQuestionIndex]?.selectedAnswer}
             isTimerEnabled={isTimerEnabled}
+            onResultAnnounced={handleResultAnnounced}
           />
         )}
       </div>

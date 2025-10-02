@@ -1,4 +1,3 @@
-// QuizQuestion.jsx - Updated with delayed navigation and repositioned voice controls
 "use client"
 
 import { useState, useEffect } from "react"
@@ -7,11 +6,13 @@ import VoiceSettings from "./VoiceSettings"
 import { useVoice } from "../hooks/useVoice"
 
 const QuizQuestion = ({ question, onAnswerSelect, selectedAnswer, isTimerEnabled, onResultAnnounced }) => {
+  // Local state
   const [clickedAnswer, setClickedAnswer] = useState(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isTimedOut, setIsTimedOut] = useState(false)
   const [showResult, setShowResult] = useState(false)
   const [isAnnouncingResult, setIsAnnouncingResult] = useState(false)
+  const [hasResultBeenAnnounced, setHasResultBeenAnnounced] = useState(false)
 
   const {
     isListening,
@@ -29,93 +30,100 @@ const QuizQuestion = ({ question, onAnswerSelect, selectedAnswer, isTimerEnabled
     setTranscript
   } = useVoice()
 
-  // Reset states when question changes
+  // Reset state when a new question loads
   useEffect(() => {
     setClickedAnswer(null)
     setIsTimedOut(false)
     setShowResult(false)
     setIsAnnouncingResult(false)
+    setHasResultBeenAnnounced(false)
     stopSpeaking()
     setTranscript('')
   }, [question])
 
-  // Show result when answer is selected or timed out
+  // Show results if an answer is selected or time runs out
   useEffect(() => {
-    if (selectedAnswer || clickedAnswer || isTimedOut) {
+    if ((selectedAnswer || clickedAnswer || isTimedOut) && !showResult) {
       setShowResult(true)
     }
   }, [selectedAnswer, clickedAnswer, isTimedOut])
 
+  // Handle answer button click
   const handleAnswerClick = (answer) => {
-    if (selectedAnswer || isAnnouncingResult) return // Prevent multiple selections
-
+    if (selectedAnswer || isAnnouncingResult) return
     setClickedAnswer(answer)
     onAnswerSelect(answer)
   }
 
-  // This function can be called by the timer component when time runs out
+  // Called when timer runs out
   const handleTimeOut = () => {
-    setIsTimedOut(true)
     if (!selectedAnswer && !clickedAnswer) {
-      setClickedAnswer(null) // Mark as no answer selected
+      setIsTimedOut(true)
+      onAnswerSelect(null) // No answer selected
     }
   }
 
-  // Expose handleTimeOut to parent if needed
+  // Expose handleTimeOut to parent globally (optional)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       window.quizQuestionHandleTimeOut = handleTimeOut
     }
   }, [selectedAnswer, clickedAnswer])
 
-  const getButtonClass = (answer) => {
-    const baseClass = "w-full p-4 text-left rounded-lg font-medium transition-all duration-300 transform "
+  // Speak the result (correct/incorrect/timed out)
+  useEffect(() => {
+    if (showResult && question && !hasResultBeenAnnounced) {
+      const isCorrect = selectedAnswer === question.correct_answer
+      const correctAnswerIndex = question.answers.indexOf(question.correct_answer)
+      const correctOption = String.fromCharCode(65 + correctAnswerIndex)
+      
+      let resultText = ""
 
-    if (!selectedAnswer && !clickedAnswer && !isTimedOut) {
-      return (
-        baseClass +
-        "bg-white hover:bg-purple-50 hover:scale-105 hover:shadow-lg text-gray-800 border-2 border-transparent hover:border-purple-300"
-      )
-    }
-
-    if (selectedAnswer || clickedAnswer || isTimedOut) {
-      if (answer === question.correct_answer) {
-        return baseClass + "bg-green-500 text-white border-2 border-green-600 scale-105 shadow-lg"
-      } else if (answer === (selectedAnswer || clickedAnswer)) {
-        return baseClass + "bg-red-500 text-white border-2 border-red-600 scale-105 shadow-lg"
+      if (isTimedOut) {
+        resultText = `Time's up! The correct answer was "${question.correct_answer}", option ${correctOption}.`
+      } else if (isCorrect) {
+        resultText = "Correct! Well done!"
       } else {
-        return baseClass + "bg-gray-300 text-gray-600 border-2 border-gray-400"
+        resultText = `Incorrect. The correct answer was "${question.correct_answer}", option ${correctOption}.`
       }
-    }
 
-    return baseClass
+      setIsAnnouncingResult(true)
+
+      // Speak result and notify when done
+      speak(resultText, () => {
+        setIsAnnouncingResult(false)
+        setHasResultBeenAnnounced(true)
+        if (onResultAnnounced) onResultAnnounced()
+      })
+    }
+  }, [showResult, selectedAnswer, isTimedOut, question, hasResultBeenAnnounced])
+
+  // Determine button styles based on answer state
+  const getButtonClass = (answer) => {
+    const base = "w-full p-4 text-left rounded-lg font-medium transition-all duration-300 transform "
+    if (!selectedAnswer && !clickedAnswer && !isTimedOut) {
+      return base + "bg-white hover:bg-purple-50 hover:scale-105 hover:shadow-lg text-gray-800 border-2 border-transparent hover:border-purple-300"
+    }
+    if (selectedAnswer || clickedAnswer || isTimedOut) {
+      if (answer === question.correct_answer) return base + "bg-green-500 text-white border-2 border-green-600 scale-105 shadow-lg"
+      if (answer === (selectedAnswer || clickedAnswer)) return base + "bg-red-500 text-white border-2 border-red-600 scale-105 shadow-lg"
+      return base + "bg-gray-300 text-gray-600 border-2 border-gray-400"
+    }
+    return base
   }
 
+  // Display ✓ or ✗ next to answers
   const getAnswerIcon = (answer) => {
     if (!selectedAnswer && !clickedAnswer && !isTimedOut) return null
-
-    if (answer === question.correct_answer) {
-      return <span className="text-2xl">✓</span>
-    } else if (answer === (selectedAnswer || clickedAnswer)) {
-      return <span className="text-2xl">✗</span>
-    }
-
+    if (answer === question.correct_answer) return <span className="text-2xl">✓</span>
+    if (answer === (selectedAnswer || clickedAnswer)) return <span className="text-2xl">✗</span>
     return null
-  }
-
-  // Handler for when result announcement is complete
-  const handleResultAnnouncementComplete = () => {
-    setIsAnnouncingResult(false)
-    // Notify parent that announcement is complete
-    if (onResultAnnounced) {
-      onResultAnnounced()
-    }
   }
 
   return (
     <>
       <div className="bg-white rounded-xl shadow-2xl p-8 max-w-3xl mx-auto relative" data-quiz-question="true">
-        {/* Voice Controls - Positioned at top right */}
+        {/* Voice Controls */}
         <div className="absolute top-4 right-4 z-10">
           <VoiceControls
             question={question}
@@ -134,11 +142,11 @@ const QuizQuestion = ({ question, onAnswerSelect, selectedAnswer, isTimerEnabled
             setTranscript={setTranscript}
             isTimedOut={isTimedOut}
             showResult={showResult}
-            onResultAnnouncementStart={() => setIsAnnouncingResult(true)}
-            onResultAnnouncementComplete={handleResultAnnouncementComplete}
+            isAnnouncingResult={isAnnouncingResult}
           />
         </div>
 
+        {/* Question Header */}
         <div className="mb-8 pr-48">
           <div className="flex items-center gap-3 mb-4">
             <div className="bg-purple-100 p-2 rounded-lg">
@@ -146,27 +154,18 @@ const QuizQuestion = ({ question, onAnswerSelect, selectedAnswer, isTimerEnabled
             </div>
             <span className="text-sm font-semibold text-purple-600 uppercase tracking-wide">{question.category}</span>
           </div>
-
           <h2 className="text-2xl md:text-3xl font-bold text-gray-800 leading-relaxed">{question.question}</h2>
 
+          {/* Badges for difficulty, type, timer, result announcement */}
           <div className="flex items-center gap-2 mt-4 flex-wrap">
-            <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-              {question.difficulty}
-            </span>
-            <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
-              {question.type}
-            </span>
-            {isTimerEnabled && (
-              <span className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm font-medium">⏱️ Timed</span>
-            )}
-            {isAnnouncingResult && (
-              <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium animate-pulse">
-                🔊 Announcing...
-              </span>
-            )}
+            <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">{question.difficulty}</span>
+            <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">{question.type}</span>
+            {isTimerEnabled && <span className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm font-medium">⏱️ Timed</span>}
+            {isAnnouncingResult && <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium animate-pulse">🔊 Announcing Result...</span>}
           </div>
         </div>
 
+        {/* Answer Buttons */}
         <div className="space-y-4">
           {question.answers.map((answer, index) => (
             <button
@@ -190,6 +189,7 @@ const QuizQuestion = ({ question, onAnswerSelect, selectedAnswer, isTimerEnabled
           ))}
         </div>
 
+        {/* Result Display */}
         {(selectedAnswer || clickedAnswer || isTimedOut) && (
           <div className="mt-6 p-4 rounded-lg bg-gray-50">
             <div className="flex items-center gap-2 flex-wrap">

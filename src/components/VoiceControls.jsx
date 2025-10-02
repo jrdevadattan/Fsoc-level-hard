@@ -1,4 +1,3 @@
-// VoiceControls.jsx - Updated with result announcement callback
 import React, { useEffect } from 'react'
 
 const VoiceControls = ({ 
@@ -18,92 +17,65 @@ const VoiceControls = ({
   setTranscript,
   isTimedOut,
   showResult,
-  onResultAnnouncementStart,
-  onResultAnnouncementComplete
+  isAnnouncingResult
 }) => {
-  // Auto-speak question when it changes
+  // Automatically read out the question and options when a new question appears
   useEffect(() => {
-    if (question && !selectedAnswer && !isTimedOut) {
-      const text = `${question.category}. ${question.question}. The options are: ${question.answers.map((ans, idx) => `${String.fromCharCode(65 + idx)}, ${ans}`).join('. ')}`
-      onSpeak(text)
+    if (question && !selectedAnswer && !isTimedOut && !showResult) {
+      const text = `${question.category}. ${question.question}. The options are: ${question.answers.map((ans, idx) => `${String.fromCharCode(65 + idx)}, ${ans}`).join('. ')}`;
+      onSpeak(text);
     }
-  }, [question?.question])
+  }, [question?.question]);
 
-  // Handle voice answer
+  // Listen for voice input and select answer if recognized
   useEffect(() => {
-    if (transcript && question && !selectedAnswer) {
-      const answer = parseVoiceAnswer(transcript, question.answers)
+    if (transcript && question && !selectedAnswer && !isTimedOut && !showResult) {
+      const answer = parseVoiceAnswer(transcript, question.answers);
       if (answer) {
-        onAnswerSelect(answer)
-        onSpeak(`You selected ${answer}`)
-        setTranscript('')
+        onAnswerSelect(answer);
+        onSpeak(`You selected ${answer}`);
+        setTranscript('');
       } else {
-        onSpeak("I didn't understand that. Please say A, B, C, or D, or option A, option B, etc.")
-        setTranscript('')
+        onSpeak("I didn't understand that. Please say A, B, C, or D, or option A, option B, etc.");
+        setTranscript('');
       }
     }
-  }, [transcript])
+  }, [transcript]);
 
-  // Speak result when answer is selected or time is up
-  useEffect(() => {
-    if (showResult && question) {
-      const isCorrect = selectedAnswer === question.correct_answer
-      const correctAnswerOption = String.fromCharCode(65 + question.answers.indexOf(question.correct_answer))
-      
-      const resultText = isTimedOut
-        ? `Time's up! The correct answer was ${question.correct_answer}, which is option ${correctAnswerOption}.`
-        : isCorrect
-        ? "Correct! Well done!"
-        : `Incorrect. The correct answer was ${question.correct_answer}, which is option ${correctAnswerOption}.`
-      
-      // Notify that announcement is starting
-      if (onResultAnnouncementStart) {
-        onResultAnnouncementStart()
-      }
-
-      setTimeout(() => {
-        onSpeak(resultText, () => {
-          // Notify when announcement is complete
-          if (onResultAnnouncementComplete) {
-            onResultAnnouncementComplete()
-          }
-        })
-      }, 300)
-    }
-  }, [showResult, selectedAnswer, isTimedOut])
-
+  // Handle clicking the "read question" button
   const handleSoundClick = () => {
     if (isSpeaking) {
-      onStopSpeaking()
-    } else if (question) {
-      const text = `${question.question}. The options are: ${question.answers.map((ans, idx) => `${String.fromCharCode(65 + idx)}, ${ans}`).join('. ')}`
-      onSpeak(text)
+      onStopSpeaking();
+    } else if (question && !showResult) {
+      const text = `${question.question}. The options are: ${question.answers.map((ans, idx) => `${String.fromCharCode(65 + idx)}, ${ans}`).join('. ')}`;
+      onSpeak(text);
     }
   }
 
+  // Handle clicking the microphone button
   const handleMicClick = () => {
     if (isListening) {
-      onStopListening()
+      onStopListening();
     } else {
       if (microphonePermission === 'denied') {
-        alert('Microphone access denied. Please enable microphone permissions in your browser settings.')
-        return
+        alert('Microphone access denied. Please enable microphone permissions in your browser settings.');
+        return;
       }
-      onStartListening()
+      onStartListening();
     }
   }
 
   return (
     <div className="flex gap-2 items-start">
-      {/* Sound Button */}
+      {/* Speak Question Button */}
       <button
         onClick={handleSoundClick}
-        disabled={!question}
+        disabled={!question || showResult}
         className={`p-3 rounded-full transition-all duration-300 shadow-lg ${
           isSpeaking
             ? 'bg-green-500 animate-pulse'
             : 'bg-purple-600 hover:bg-purple-700 hover:scale-110'
-        } ${!question ? 'opacity-50 cursor-not-allowed' : ''}`}
+        } ${(!question || showResult) ? 'opacity-50 cursor-not-allowed' : ''}`}
         title={isSpeaking ? 'Stop speaking' : 'Read question aloud'}
       >
         {isSpeaking ? (
@@ -117,15 +89,15 @@ const VoiceControls = ({
         )}
       </button>
 
-      {/* Microphone Button */}
+      {/* Voice Answer Button */}
       <button
         onClick={handleMicClick}
-        disabled={!question || selectedAnswer || isTimedOut}
+        disabled={!question || selectedAnswer || isTimedOut || showResult}
         className={`p-3 rounded-full transition-all duration-300 shadow-lg ${
           isListening
             ? 'bg-red-500 animate-pulse'
             : 'bg-blue-600 hover:bg-blue-700 hover:scale-110'
-        } ${(!question || selectedAnswer || isTimedOut) ? 'opacity-50 cursor-not-allowed' : ''}`}
+        } ${(!question || selectedAnswer || isTimedOut || showResult) ? 'opacity-50 cursor-not-allowed' : ''}`}
         title={isListening ? 'Stop listening' : 'Answer by voice'}
       >
         {isListening ? (
@@ -144,7 +116,7 @@ const VoiceControls = ({
         )}
       </button>
 
-      {/* Settings Button */}
+      {/* Open Voice Settings */}
       <button
         onClick={onOpenSettings}
         className="p-3 rounded-full bg-gray-700 hover:bg-gray-800 hover:scale-110 transition-all duration-300 shadow-lg"
@@ -155,14 +127,14 @@ const VoiceControls = ({
         </svg>
       </button>
 
-      {/* Listening Indicator - positioned below buttons */}
+      {/* Indicator for active listening */}
       {isListening && (
         <div className="absolute top-full right-0 mt-2 bg-red-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-lg animate-pulse whitespace-nowrap">
           🎤 Listening...
         </div>
       )}
 
-      {/* Transcript Display - positioned below buttons */}
+      {/* Display the transcript while user is speaking */}
       {transcript && (
         <div className="absolute top-full right-0 mt-2 bg-blue-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-lg whitespace-nowrap">
           "{transcript}"
