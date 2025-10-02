@@ -8,265 +8,441 @@ import QuizSetupPage from "./QuizSetupPage";
 import CountdownTimer from "./CountdownTimer";
 import TimerSettings from "./TimerSettings";
 import KeyboardShortcuts from "./KeyboardShortcuts";
+import PauseButton from "./PauseButton";
+import PauseOverlay from "./PauseOverlay";
+import QuizStateManager from "../utils/QuizStateManager";
 
 const QuizApp = () => {
-  // core quiz state
-  const [questions, setQuestions] = useState([]);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [selectedAnswers, setSelectedAnswers] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [quizCompleted, setQuizCompleted] = useState(false);
-  const [score, setScore] = useState(0);
+    // core quiz state
+    const [questions, setQuestions] = useState([]);
+    const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+    const [selectedAnswers, setSelectedAnswers] = useState([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const [quizCompleted, setQuizCompleted] = useState(false);
+    const [score, setScore] = useState(0);
 
-  // setup state
-  const [showSetup, setShowSetup] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState("");
+    // setup state
+    const [showSetup, setShowSetup] = useState(true);
+    const [selectedCategory, setSelectedCategory] = useState("");
 
-  // timer state
-  const [timerDuration, setTimerDuration] = useState(30);
-  const [isTimerEnabled, setIsTimerEnabled] = useState(true);
-  const [isTimerPaused, setIsTimerPaused] = useState(false);
+    // timer state
+    const [timerDuration, setTimerDuration] = useState(30);
+    const [isTimerEnabled, setIsTimerEnabled] = useState(true);
+    const [isTimerPaused, setIsTimerPaused] = useState(false);
+    const [timeRemaining, setTimeRemaining] = useState(null);
 
-  const decodeHtmlEntities = (text) => {
-    const textarea = document.createElement("textarea");
-    textarea.innerHTML = text;
-    return textarea.value;
-  };
+    // pause/resume state
+    const [isQuizPaused, setIsQuizPaused] = useState(false);
+    const [quizStartTime, setQuizStartTime] = useState(null);
 
-  const fetchQuestions = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      // read preferences from localStorage (if any)
-      const prefRaw = localStorage.getItem("quizPreferences");
-      let prefs = null;
-      if (prefRaw) {
-        try {
-          prefs = JSON.parse(prefRaw);
-        } catch {
-          prefs = null;
-        }
-      }
-
-      const amount = prefs?.numQuestions || 10;
-      const categoryId = prefs?.category?.id || null;
-      const difficulty = prefs?.difficulty?.toLowerCase() || null;
-      const type = prefs?.questionType || null;
-
-      if (prefs?.category?.name) setSelectedCategory(prefs.category.name);
-
-      const params = new URLSearchParams();
-      params.append("amount", amount);
-      if (categoryId) params.append("category", categoryId);
-      if (difficulty) params.append("difficulty", difficulty);
-      if (type) params.append("type", type);
-
-      const url = `https://opentdb.com/api.php?${params.toString()}`;
-      const response = await fetch(url);
-
-      if (!response.ok) throw new Error("Failed to fetch questions");
-
-      const data = await response.json();
-      if (data.response_code !== 0) {
-        throw new Error(
-          "No questions available for the selected options. Try changing the number/category/difficulty/type."
-        );
-      }
-
-      // prepare questions: decode HTML and shuffle answers
-      const processedQuestions = data.results.map((question) => {
-        const answers = [
-          ...question.incorrect_answers,
-          question.correct_answer,
-        ];
-        const shuffledAnswers = answers.sort(() => Math.random() - 0.5);
-
-        return {
-          ...question,
-          question: decodeHtmlEntities(question.question),
-          correct_answer: decodeHtmlEntities(question.correct_answer),
-          answers: shuffledAnswers.map((a) => decodeHtmlEntities(a)),
-        };
-      });
-
-      setQuestions(processedQuestions);
-      setCurrentQuestionIndex(0);
-      setSelectedAnswers([]);
-      setQuizCompleted(false);
-      setScore(0);
-    } catch (err) {
-      setError(err.message || "Unknown error");
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  // load questions after user finishes setup
-  useEffect(() => {
-    if (!showSetup) {
-      fetchQuestions();
-    }
-  }, [showSetup, fetchQuestions]);
-
-  const handleAnswerSelect = (selectedAnswer) => {
-    const currentQuestion = questions[currentQuestionIndex];
-    const isCorrect = selectedAnswer === currentQuestion?.correct_answer;
-
-    const answerData = {
-      questionIndex: currentQuestionIndex,
-      selectedAnswer,
-      correctAnswer: currentQuestion?.correct_answer ?? null,
-      isCorrect: Boolean(isCorrect),
+    const decodeHtmlEntities = (text) => {
+        const textarea = document.createElement("textarea");
+        textarea.innerHTML = text;
+        return textarea.value;
     };
 
-    setSelectedAnswers((prev) => [...prev, answerData]);
-    if (isCorrect) setScore((prev) => prev + 1);
+    // Save quiz state to localStorage
+    const saveQuizState = useCallback(() => {
+        if (questions.length === 0) return;
 
-    // pause timer while moving to next
-    setIsTimerPaused(true);
+        const state = QuizStateManager.createQuizState({
+            questions,
+            currentQuestionIndex,
+            selectedAnswers,
+            score,
+            timeRemaining,
+            timerDuration,
+            isTimerEnabled,
+            selectedCategory,
+            quizStartTime,
+        });
 
-    if (currentQuestionIndex < questions.length - 1) {
-      setTimeout(() => {
-        setCurrentQuestionIndex((prev) => prev + 1);
-        setIsTimerPaused(false);
-      }, 1000);
-    } else {
-      setTimeout(() => setQuizCompleted(true), 1000);
-    }
-  };
+        QuizStateManager.saveQuizState(state);
+    }, [
+        questions,
+        currentQuestionIndex,
+        selectedAnswers,
+        score,
+        timeRemaining,
+        timerDuration,
+        isTimerEnabled,
+        selectedCategory,
+        quizStartTime,
+    ]);
 
-  const handleTimerExpired = () => {
-    // treat expiration like selecting no answer
-    handleAnswerSelect(null);
-  };
+    // Load quiz state from localStorage
+    const loadSavedQuizState = useCallback(() => {
+        const savedState = QuizStateManager.loadQuizState();
+        if (!savedState) return false;
 
-  const handleTimerWarning = () => {
-    // optional: sound or visual warning
-    console.log("Timer warning: 10 seconds remaining");
-  };
+        setQuestions(savedState.questions);
+        setCurrentQuestionIndex(savedState.currentQuestionIndex);
+        setSelectedAnswers(savedState.selectedAnswers);
+        setScore(savedState.score);
+        setTimeRemaining(savedState.timeRemaining);
+        setTimerDuration(savedState.timerDuration);
+        setIsTimerEnabled(savedState.isTimerEnabled);
+        setSelectedCategory(savedState.selectedCategory);
+        setQuizStartTime(savedState.quizStartTime);
+        setIsQuizPaused(true);
 
-  const restartQuiz = () => {
-    setCurrentQuestionIndex(0);
-    setSelectedAnswers([]);
-    setQuizCompleted(false);
-    setScore(0);
-    setIsTimerPaused(false);
-    fetchQuestions();
-  };
+        return true;
+    }, []);
 
-  // show setup page until user starts quiz
-  if (showSetup) {
-    return <QuizSetupPage onStart={() => setShowSetup(false)} />;
-  }
+    // Handle pause/resume toggle
+    const handlePauseToggle = useCallback(() => {
+        if (quizCompleted || showSetup) return;
 
-  if (isLoading) return <LoadingSpinner />;
+        if (isQuizPaused) {
+            // Resume quiz
+            setIsQuizPaused(false);
+            setIsTimerPaused(false);
+            QuizStateManager.clearQuizState();
+        } else {
+            // Pause quiz
+            setIsQuizPaused(true);
+            setIsTimerPaused(true);
+            saveQuizState();
+        }
+    }, [isQuizPaused, quizCompleted, showSetup, saveQuizState]);
 
-  if (error) {
-    return (
-      <div className="h-screen overflow-hidden bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full text-center">
-          <div className="text-red-500 text-6xl mb-4">⚠️</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">
-            Oops! Something went wrong
-          </h2>
-          <p className="text-gray-600 mb-6">{error}</p>
-          <button
-            onClick={fetchQuestions}
-            className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200"
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    );
-  }
+    // Handle timer updates
+    const handleTimerUpdate = useCallback((newTimeRemaining) => {
+        setTimeRemaining(newTimeRemaining);
+    }, []);
 
-  if (quizCompleted) {
-    return (
-      <>
-        <KeyboardShortcuts />
-        <QuizResults
-          score={score}
-          totalQuestions={questions.length}
-          onRestart={restartQuiz}
-        />
-      </>
-    );
-  }
+    const fetchQuestions = useCallback(async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 p-4">
-      <KeyboardShortcuts />
-      <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-8 relative">
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">
-            Quiz Challenge
-          </h1>
-          <p className="text-purple-200 text-lg">
-            Test your knowledge with {selectedCategory || "this topic"}{" "}
-            questions!
-          </p>
-
-          <div className="absolute top-0 right-0">
-            <TimerSettings
-              currentDuration={timerDuration}
-              onDurationChange={setTimerDuration}
-              isTimerEnabled={isTimerEnabled}
-              onTimerToggle={setIsTimerEnabled}
-            />
-          </div>
-        </div>
-
-        <div className="bg-white/20 rounded-full h-3 mb-8 overflow-hidden">
-          <div
-            className="bg-gradient-to-r from-pink-400 to-indigo-500 h-full rounded-full transition-all duration-500 ease-out"
-            style={{
-              width: `${
-                questions.length
-                  ? ((currentQuestionIndex + 1) / questions.length) * 100
-                  : 0
-              }%`,
-            }}
-          ></div>
-        </div>
-
-        <div className="mb-6">
-          {isTimerEnabled && timerDuration > 0 && (
-            <div className="mb-6">
-              <CountdownTimer
-                duration={timerDuration}
-                onTimeUp={handleTimerExpired}
-                isActive={!quizCompleted}
-                isPaused={isTimerPaused}
-                onWarning={handleTimerWarning}
-                showWarningAt={10}
-                key={`timer-${currentQuestionIndex}`}
-              />
-            </div>
-          )}
-
-          <div className="text-center">
-            <span className="bg-white/20 text-white px-4 py-2 rounded-full text-lg font-semibold">
-              Question {currentQuestionIndex + 1} of {questions.length || 0}
-            </span>
-          </div>
-        </div>
-
-        {questions.length > 0 && (
-          <QuizQuestion
-            question={questions[currentQuestionIndex]}
-            onAnswerSelect={handleAnswerSelect}
-            selectedAnswer={
-              selectedAnswers[currentQuestionIndex]?.selectedAnswer
+            // read preferences from localStorage (if any)
+            const prefRaw = localStorage.getItem("quizPreferences");
+            let prefs = null;
+            if (prefRaw) {
+                try {
+                    prefs = JSON.parse(prefRaw);
+                } catch {
+                    prefs = null;
+                }
             }
-            isTimerEnabled={isTimerEnabled}
-          />
-        )}
-      </div>
-    </div>
-  );
+
+            const amount = prefs?.numQuestions || 10;
+            const categoryId = prefs?.category?.id || null;
+            const difficulty = prefs?.difficulty?.toLowerCase() || null;
+            const type = prefs?.questionType || null;
+
+            if (prefs?.category?.name) setSelectedCategory(prefs.category.name);
+
+            const params = new URLSearchParams();
+            params.append("amount", amount);
+            if (categoryId) params.append("category", categoryId);
+            if (difficulty) params.append("difficulty", difficulty);
+            if (type) params.append("type", type);
+
+            const url = `https://opentdb.com/api.php?${params.toString()}`;
+            const response = await fetch(url);
+
+            if (!response.ok) throw new Error("Failed to fetch questions");
+
+            const data = await response.json();
+            if (data.response_code !== 0) {
+                throw new Error(
+                    "No questions available for the selected options. Try changing the number/category/difficulty/type.",
+                );
+            }
+
+            // prepare questions: decode HTML and shuffle answers
+            const processedQuestions = data.results.map((question) => {
+                const answers = [
+                    ...question.incorrect_answers,
+                    question.correct_answer,
+                ];
+                const shuffledAnswers = answers.sort(() => Math.random() - 0.5);
+
+                return {
+                    ...question,
+                    question: decodeHtmlEntities(question.question),
+                    correct_answer: decodeHtmlEntities(question.correct_answer),
+                    answers: shuffledAnswers.map((a) => decodeHtmlEntities(a)),
+                };
+            });
+
+            setQuestions(processedQuestions);
+            setCurrentQuestionIndex(0);
+            setSelectedAnswers([]);
+            setQuizCompleted(false);
+            setScore(0);
+            setQuizStartTime(Date.now());
+            setTimeRemaining(isTimerEnabled ? timerDuration : null);
+            setIsQuizPaused(false);
+            setIsTimerPaused(false);
+
+            // Clear any previously saved state
+            QuizStateManager.clearQuizState();
+        } catch (err) {
+            setError(err.message || "Unknown error");
+        } finally {
+            setIsLoading(false);
+        }
+    }, [isTimerEnabled, timerDuration]);
+
+    // load questions after user finishes setup
+    useEffect(() => {
+        if (!showSetup) {
+            // Try to load saved state first
+            const hasSavedState = loadSavedQuizState();
+            if (!hasSavedState) {
+                fetchQuestions();
+            }
+        }
+    }, [showSetup, fetchQuestions, loadSavedQuizState]);
+
+    // Auto-save state periodically when quiz is active and not paused
+    useEffect(() => {
+        if (
+            !isQuizPaused &&
+            questions.length > 0 &&
+            !quizCompleted &&
+            !showSetup
+        ) {
+            const interval = setInterval(saveQuizState, 5000); // Save every 5 seconds
+            return () => clearInterval(interval);
+        }
+    }, [
+        isQuizPaused,
+        questions.length,
+        quizCompleted,
+        showSetup,
+        saveQuizState,
+    ]);
+
+    // Handle page visibility change to auto-pause
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (
+                document.hidden &&
+                !isQuizPaused &&
+                !quizCompleted &&
+                !showSetup
+            ) {
+                handlePauseToggle();
+            }
+        };
+
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+        return () =>
+            document.removeEventListener(
+                "visibilitychange",
+                handleVisibilityChange,
+            );
+    }, [isQuizPaused, quizCompleted, showSetup, handlePauseToggle]);
+
+    const handleAnswerSelect = (selectedAnswer) => {
+        const currentQuestion = questions[currentQuestionIndex];
+        const isCorrect = selectedAnswer === currentQuestion?.correct_answer;
+
+        const answerData = {
+            questionIndex: currentQuestionIndex,
+            selectedAnswer,
+            correctAnswer: currentQuestion?.correct_answer ?? null,
+            isCorrect: Boolean(isCorrect),
+        };
+
+        setSelectedAnswers((prev) => [...prev, answerData]);
+        if (isCorrect) setScore((prev) => prev + 1);
+
+        // pause timer while moving to next
+        setIsTimerPaused(true);
+
+        if (currentQuestionIndex < questions.length - 1) {
+            setTimeout(() => {
+                setCurrentQuestionIndex((prev) => prev + 1);
+                setIsTimerPaused(false);
+            }, 1000);
+        } else {
+            setTimeout(() => setQuizCompleted(true), 1000);
+        }
+    };
+
+    const handleTimerExpired = () => {
+        // treat expiration like selecting no answer
+        handleAnswerSelect(null);
+    };
+
+    const handleTimerWarning = () => {
+        // optional: sound or visual warning
+        console.log("Timer warning: 10 seconds remaining");
+    };
+
+    const restartQuiz = () => {
+        setCurrentQuestionIndex(0);
+        setSelectedAnswers([]);
+        setQuizCompleted(false);
+        setScore(0);
+        setIsTimerPaused(false);
+        setIsQuizPaused(false);
+        setTimeRemaining(null);
+        QuizStateManager.clearQuizState();
+        fetchQuestions();
+    };
+
+    // show setup page until user starts quiz
+    if (showSetup) {
+        return <QuizSetupPage onStart={() => setShowSetup(false)} />;
+    }
+
+    if (isLoading) return <LoadingSpinner />;
+
+    if (error) {
+        return (
+            <div className="h-screen overflow-hidden bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center p-4">
+                <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full text-center">
+                    <div className="text-red-500 text-6xl mb-4">⚠️</div>
+                    <h2 className="text-2xl font-bold text-gray-800 mb-4">
+                        Oops! Something went wrong
+                    </h2>
+                    <p className="text-gray-600 mb-6">{error}</p>
+                    <button
+                        onClick={fetchQuestions}
+                        className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200"
+                    >
+                        Try Again
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (quizCompleted) {
+        return (
+            <>
+                <KeyboardShortcuts />
+                <QuizResults
+                    score={score}
+                    totalQuestions={questions.length}
+                    onRestart={restartQuiz}
+                />
+            </>
+        );
+    }
+
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 p-4">
+            <KeyboardShortcuts
+                onPauseToggle={handlePauseToggle}
+                isPaused={isQuizPaused}
+            />
+
+            <PauseOverlay
+                isVisible={isQuizPaused}
+                onResume={handlePauseToggle}
+                currentQuestionNumber={currentQuestionIndex + 1}
+                totalQuestions={questions.length}
+                timeRemaining={timeRemaining}
+                score={score}
+            />
+
+            <div className="max-w-4xl mx-auto pt-4">
+                <div className="text-center mb-8 relative">
+                    <div className="absolute top-0 left-0">
+                        <PauseButton
+                            isPaused={isQuizPaused}
+                            onTogglePause={handlePauseToggle}
+                            disabled={quizCompleted}
+                        />
+                    </div>
+
+                    <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">
+                        Quiz Challenge
+                    </h1>
+                    <p className="text-purple-200 text-lg">
+                        Test your knowledge with{" "}
+                        {selectedCategory || "this topic"} questions!
+                    </p>
+
+                    <div className="absolute top-0 right-0">
+                        <TimerSettings
+                            currentDuration={timerDuration}
+                            onDurationChange={setTimerDuration}
+                            isTimerEnabled={isTimerEnabled}
+                            onTimerToggle={setIsTimerEnabled}
+                        />
+                    </div>
+                </div>
+
+                <div className="bg-white/20 rounded-full h-3 mb-8 overflow-hidden">
+                    <div
+                        className="bg-gradient-to-r from-pink-400 to-indigo-500 h-full rounded-full transition-all duration-500 ease-out"
+                        style={{
+                            width: `${
+                                questions.length
+                                    ? ((currentQuestionIndex + 1) /
+                                          questions.length) *
+                                      100
+                                    : 0
+                            }%`,
+                        }}
+                    ></div>
+                </div>
+
+                <div className="mb-6">
+                    {isTimerEnabled && timerDuration > 0 && (
+                        <div className="mb-6">
+                            <CountdownTimer
+                                duration={timerDuration}
+                                onTimeUp={handleTimerExpired}
+                                isActive={!quizCompleted}
+                                isPaused={isTimerPaused || isQuizPaused}
+                                onWarning={handleTimerWarning}
+                                showWarningAt={10}
+                                initialTimeRemaining={timeRemaining}
+                                onTimeUpdate={handleTimerUpdate}
+                                key={`timer-${currentQuestionIndex}`}
+                            />
+                        </div>
+                    )}
+
+                    <div className="text-center">
+                        <span className="bg-white/20 text-white px-4 py-2 rounded-full text-lg font-semibold">
+                            Question {currentQuestionIndex + 1} of{" "}
+                            {questions.length || 0}
+                        </span>
+                    </div>
+                </div>
+
+                {questions.length > 0 && !isQuizPaused && (
+                    <QuizQuestion
+                        question={questions[currentQuestionIndex]}
+                        onAnswerSelect={handleAnswerSelect}
+                        selectedAnswer={
+                            selectedAnswers[currentQuestionIndex]
+                                ?.selectedAnswer
+                        }
+                        isTimerEnabled={isTimerEnabled}
+                    />
+                )}
+
+                {isQuizPaused && (
+                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-8 text-center border border-white/20 shadow-xl">
+                        <div className="text-white text-lg">
+                            <div className="w-20 h-20 bg-gradient-to-br from-orange-400/20 to-orange-600/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-orange-300/30">
+                                <div className="text-4xl">⏸️</div>
+                            </div>
+                            <h3 className="text-xl font-semibold mb-2">
+                                Quiz Paused
+                            </h3>
+                            <p className="text-white/80">
+                                Click the resume button or press spacebar to
+                                continue.
+                            </p>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
 };
 
 export default QuizApp;
