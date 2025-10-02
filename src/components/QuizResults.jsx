@@ -1,6 +1,8 @@
 "use client";
 
-const QuizResults = ({ score, totalQuestions, onRestart, onBackToSetup }) => {
+// Display final results and basic stats including skipped questions
+const QuizResults = ({ score, totalQuestions, onRestart, onBackToSetup, skippedCount = 0 }) => {
+    const answered = totalQuestions - skippedCount;
     const percentage = Math.round((score / totalQuestions) * 100);
 
     const getResultMessage = () => {
@@ -102,11 +104,20 @@ const QuizResults = ({ score, totalQuestions, onRestart, onBackToSetup }) => {
                     </div>
                     <div className="bg-red-50 p-4 rounded-lg">
                         <div className="text-2xl font-bold text-red-600">
-                            {totalQuestions - score}
+                            {Math.max(0, answered - score)}
                         </div>
                         <div className="text-sm text-red-700">Incorrect</div>
                     </div>
                 </div>
+
+                {skippedCount > 0 && (
+                    <div className="mb-6">
+                        <div className="bg-yellow-50 p-4 rounded-lg">
+                            <div className="text-xl font-bold text-yellow-700">{skippedCount} Skipped</div>
+                            <div className="text-sm text-yellow-800">You skipped these questions during the session.</div>
+                        </div>
+                    </div>
+                )}
 
                 <div className="space-y-3">
                     <button
