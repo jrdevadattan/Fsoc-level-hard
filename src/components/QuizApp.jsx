@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import QuizQuestion from "./QuizQuestion";
 import QuizResults from "./QuizResults";
+import QuizReviewWrapper from "./QuizReviewWrapper";
 import LoadingSpinner from "./LoadingSpinner";
 import QuizSetupPage from "./QuizSetupPage";
 import CountdownTimer from "./CountdownTimer";
@@ -21,6 +22,7 @@ const QuizApp = () => {
     const [error, setError] = useState(null);
     const [quizCompleted, setQuizCompleted] = useState(false);
     const [score, setScore] = useState(0);
+    const [reviewMode, setReviewMode] = useState(false);
 
     // setup state
     const [showSetup, setShowSetup] = useState(true);
@@ -345,6 +347,15 @@ const QuizApp = () => {
         );
     }
 
+    if (quizCompleted && reviewMode) {
+        return (
+            <QuizReviewWrapper
+                questions={questions}
+                userAnswers={selectedAnswers.map(a => a.selectedAnswer)}
+                onBack={() => setReviewMode(false)}
+            />
+        );
+    }
     if (quizCompleted) {
         return (
             <>
@@ -354,6 +365,7 @@ const QuizApp = () => {
                     totalQuestions={questions.length}
                     onRestart={restartQuiz}
                     onBackToSetup={handleBackToSetup}
+                    onReview={() => setReviewMode(true)}
                 />
             </>
         );

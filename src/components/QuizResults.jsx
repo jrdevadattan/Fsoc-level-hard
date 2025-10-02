@@ -1,6 +1,6 @@
 "use client";
 
-const QuizResults = ({ score, totalQuestions, onRestart, onBackToSetup }) => {
+const QuizResults = ({ score, totalQuestions, onRestart, onBackToSetup, onReview }) => {
     const percentage = Math.round((score / totalQuestions) * 100);
 
     const getResultMessage = () => {
@@ -122,6 +122,13 @@ const QuizResults = ({ score, totalQuestions, onRestart, onBackToSetup }) => {
                         className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-black font-bold py-4 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg"
                     >
                         ⚙️ Back to Setup
+                    </button>
+
+                    <button
+                        onClick={onReview}
+                        className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg"
+                    >
+                        📝 Review Answers
                     </button>
 
                     <button
