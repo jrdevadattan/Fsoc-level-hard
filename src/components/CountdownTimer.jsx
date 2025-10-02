@@ -14,7 +14,6 @@ const CountdownTimer = ({
     const intervalRef = useRef(null);
     const hasWarningFired = useRef(false);
 
-    // Reset timer when duration changes
     useEffect(() => {
         setTimeRemaining(duration);
         hasWarningFired.current = false;
@@ -23,7 +22,6 @@ const CountdownTimer = ({
         }
     }, [duration, isActive, isPaused]);
 
-    // Handle pause/resume
     useEffect(() => {
         if (isPaused) {
             setIsRunning(false);
@@ -32,14 +30,12 @@ const CountdownTimer = ({
         }
     }, [isPaused, isActive, timeRemaining]);
 
-    // Timer logic
     useEffect(() => {
         if (isRunning && timeRemaining > 0) {
             intervalRef.current = setInterval(() => {
                 setTimeRemaining((prev) => {
                     const newTime = prev - 1;
 
-                    // Fire warning at specified time
                     if (
                         newTime === showWarningAt &&
                         !hasWarningFired.current &&
@@ -49,7 +45,6 @@ const CountdownTimer = ({
                         onWarning();
                     }
 
-                    // Fire time up when reaching 0
                     if (newTime <= 0) {
                         setIsRunning(false);
                         if (onTimeUp) {
@@ -75,10 +70,8 @@ const CountdownTimer = ({
         };
     }, [isRunning, timeRemaining, onTimeUp, showWarningAt, onWarning]);
 
-    // Calculate progress percentage
     const progressPercentage = (timeRemaining / duration) * 100;
 
-    // Determine color based on time remaining
     const getTimerColor = () => {
         const percentage = (timeRemaining / duration) * 100;
         if (percentage <= 20) return "text-red-500";
@@ -100,7 +93,6 @@ const CountdownTimer = ({
         return "shadow-green-500/50";
     };
 
-    // Format time display
     const formatTime = (seconds) => {
         if (seconds >= 60) {
             const minutes = Math.floor(seconds / 60);
@@ -116,7 +108,6 @@ const CountdownTimer = ({
 
     return (
         <div className={`w-full ${className}`}>
-            {/* Timer Display */}
             <div className="flex items-center justify-center gap-3 mb-4">
                 <div
                     className={`text-2xl transition-colors duration-300 ${getTimerColor()}`}
@@ -130,12 +121,9 @@ const CountdownTimer = ({
                 </span>
             </div>
 
-            {/* Progress Bar Container */}
             <div className="relative w-full h-4 bg-gray-200 rounded-full overflow-hidden">
-                {/* Background track */}
                 <div className="absolute inset-0 bg-gray-300 rounded-full"></div>
 
-                {/* Progress bar */}
                 <div
                     className={`absolute left-0 top-0 h-full rounded-full transition-all duration-1000 ease-linear ${getProgressBarColor()} ${getProgressBarGlow()} shadow-lg`}
                     style={{
@@ -144,11 +132,9 @@ const CountdownTimer = ({
                             "width 1s linear, background-color 0.3s ease",
                     }}
                 >
-                    {/* Shine effect */}
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent rounded-full"></div>
                 </div>
 
-                {/* Warning pulse effect when time is low */}
                 {timeRemaining <= showWarningAt && (
                     <div
                         className={`absolute inset-0 rounded-full animate-pulse ${getProgressBarColor()} opacity-30`}

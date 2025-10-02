@@ -38,12 +38,10 @@ const QuizResults = ({ score, totalQuestions, onRestart }) => {
     return (
         <div className="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center transform animate-pulse">
-                {/* Celebration Animation */}
                 <div className="text-8xl mb-6 animate-bounce">
                     {result.emoji}
                 </div>
 
-                {/* Results Header */}
                 <h2 className="text-3xl font-bold text-gray-800 mb-2">
                     Quiz Complete!
                 </h2>
@@ -52,7 +50,6 @@ const QuizResults = ({ score, totalQuestions, onRestart }) => {
                     {result.message}
                 </p>
 
-                {/* Score Display */}
                 <div className="bg-gray-50 rounded-xl p-6 mb-8">
                     <div className="text-6xl font-bold text-gray-800 mb-2">
                         {score}/{totalQuestions}
@@ -61,13 +58,11 @@ const QuizResults = ({ score, totalQuestions, onRestart }) => {
                         {percentage}% Correct
                     </div>
 
-                    {/* Progress Ring */}
                     <div className="relative w-32 h-32 mx-auto mb-4">
                         <svg
                             className="w-32 h-32 transform -rotate-90"
                             viewBox="0 0 120 120"
                         >
-                            {/* Background Circle */}
                             <circle
                                 cx="60"
                                 cy="60"
@@ -76,7 +71,6 @@ const QuizResults = ({ score, totalQuestions, onRestart }) => {
                                 stroke="#e5e7eb"
                                 strokeWidth="8"
                             />
-                            {/* Progress Circle */}
                             <circle
                                 cx="60"
                                 cy="60"
@@ -97,7 +91,6 @@ const QuizResults = ({ score, totalQuestions, onRestart }) => {
                     </div>
                 </div>
 
-                {/* Performance Breakdown */}
                 <div className="grid grid-cols-2 gap-4 mb-8">
                     <div className="bg-green-50 p-4 rounded-lg">
                         <div className="text-2xl font-bold text-green-600">
@@ -113,7 +106,6 @@ const QuizResults = ({ score, totalQuestions, onRestart }) => {
                     </div>
                 </div>
 
-                {/* Action Buttons */}
                 <div className="space-y-3">
                     <button
                         onClick={onRestart}
@@ -132,7 +124,6 @@ const QuizResults = ({ score, totalQuestions, onRestart }) => {
                     </button>
                 </div>
 
-                {/* Share Results */}
                 <div className="mt-6">
                     <p className="text-sm text-gray-500 mb-3">
                         Share your results:

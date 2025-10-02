@@ -31,7 +31,6 @@ const TimerSettings = ({
 
     return (
         <div className={`relative ${className}`}>
-            {/* Settings Button */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
                 className="flex items-center justify-center w-10 h-10 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-all duration-200 backdrop-blur-sm border border-white/20 hover:border-white/40 touch-manipulation"
@@ -41,10 +40,8 @@ const TimerSettings = ({
                 <span className="text-lg">⚙️</span>
             </button>
 
-            {/* Dropdown Menu */}
             {isOpen && (
                 <div className="absolute top-full right-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden z-50 min-w-64 max-w-xs sm:max-w-sm">
-                    {/* Timer Enable/Disable Toggle */}
                     <div className="p-4 border-b border-gray-100">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
@@ -72,7 +69,6 @@ const TimerSettings = ({
                         </div>
                     </div>
 
-                    {/* Timer Duration Options */}
                     {isTimerEnabled && (
                         <div className="p-2">
                             <div className="text-sm font-medium text-gray-600 px-3 py-2">
@@ -106,7 +102,6 @@ const TimerSettings = ({
                         </div>
                     )}
 
-                    {/* Current Setting Display */}
                     <div className="p-3 bg-gray-50 border-t border-gray-100">
                         <div className="text-sm text-gray-600">
                             Current Setting:
@@ -120,7 +115,6 @@ const TimerSettings = ({
                 </div>
             )}
 
-            {/* Overlay to close dropdown when clicking outside */}
             {isOpen && (
                 <div
                     className="fixed inset-0 z-40"

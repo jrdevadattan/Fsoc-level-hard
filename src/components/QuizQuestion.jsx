@@ -67,7 +67,6 @@ const QuizQuestion = ({
 
     return (
         <div className="bg-white rounded-xl shadow-2xl p-8 max-w-3xl mx-auto">
-            {/* Question */}
             <div className="mb-8">
                 <div className="flex items-center gap-3 mb-4">
                     <div className="bg-purple-100 p-2 rounded-lg">
@@ -97,7 +96,6 @@ const QuizQuestion = ({
                 </div>
             </div>
 
-            {/* Answers */}
             <div className="space-y-4">
                 {question.answers.map((answer, index) => (
                     <button
@@ -119,7 +117,6 @@ const QuizQuestion = ({
                 ))}
             </div>
 
-            {/* Feedback */}
             {(selectedAnswer || clickedAnswer) && (
                 <div className="mt-6 p-4 rounded-lg bg-gray-50">
                     <div className="flex items-center gap-2">
