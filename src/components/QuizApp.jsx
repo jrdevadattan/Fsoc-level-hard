@@ -13,7 +13,7 @@ import QuizStateManager from "../utils/QuizStateManager";
 import BookmarkManager from "../utils/BookmarkManager";
 
 const QuizApp = () => {
-  // ---------- Core Quiz State ----------
+  // Core quiz state: questions, index, answers and score
   const [questions, setQuestions] = useState([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState([]);
@@ -22,31 +22,32 @@ const QuizApp = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // ---------- Quiz Setup State ----------
+  // Setup UI: show setup screen and selected category
   const [showSetup, setShowSetup] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("");
 
-  // ---------- Timer State ----------
+  // Timer state
   const [timerDuration, setTimerDuration] = useState(30);
   const [isTimerEnabled, setIsTimerEnabled] = useState(true);
   const [isTimerPaused, setIsTimerPaused] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(null);
 
-  // ---------- Pause State ----------
+  // Pause state and misc UI toggles
   const [isQuizPaused, setIsQuizPaused] = useState(false);
   const [quizStartTime, setQuizStartTime] = useState(null);
+  const [showSkippedList, setShowSkippedList] = useState(false);
 
-  // ---------- TTS / Result Announcement ----------
+  // TTS/result announcement state (used to auto-advance)
   const [isResultAnnouncementComplete, setIsResultAnnouncementComplete] = useState(false);
 
-  // ---------- Helper to decode HTML entities ----------
+  // Helper: decode HTML entities coming from the API
   const decodeHtmlEntities = (text) => {
     const textarea = document.createElement("textarea");
     textarea.innerHTML = text;
     return textarea.value;
   };
 
-  // ---------- Save / Load Quiz State ----------
+  // Save / load quiz state using QuizStateManager
   const saveQuizState = useCallback(() => {
     if (questions.length === 0) return;
 
@@ -93,7 +94,7 @@ const QuizApp = () => {
     return true;
   }, []);
 
-  // ---------- Handle Pause / Resume ----------
+  // Pause/resume handling — saves state when pausing
   const handlePauseToggle = useCallback(() => {
     if (quizCompleted || showSetup) return;
 
@@ -108,7 +109,7 @@ const QuizApp = () => {
     }
   }, [isQuizPaused, quizCompleted, showSetup, saveQuizState]);
 
-  // ---------- Fetch Questions ----------
+  // Fetch questions from OpenTDB and initialize quiz
   const fetchQuestions = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -171,7 +172,7 @@ const QuizApp = () => {
     }
   }, [timerDuration, isTimerEnabled]);
 
-  // ---------- Auto-save every 5s ----------
+  // Auto-save the quiz state periodically while running
   useEffect(() => {
     if (!isQuizPaused && questions.length > 0 && !quizCompleted && !showSetup) {
       const interval = setInterval(saveQuizState, 5000);
@@ -179,7 +180,7 @@ const QuizApp = () => {
     }
   }, [isQuizPaused, questions.length, quizCompleted, showSetup, saveQuizState]);
 
-  // ---------- Load saved state or fetch questions after setup ----------
+  // After setup: try to load saved state, otherwise fetch new questions
   useEffect(() => {
     if (!showSetup) {
       const hasSavedState = loadSavedQuizState();
@@ -187,7 +188,7 @@ const QuizApp = () => {
     }
   }, [showSetup, loadSavedQuizState, fetchQuestions]);
 
-  // ---------- Auto-pause on visibility change ----------
+  // Auto-pause when the tab/window becomes hidden
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden && !isQuizPaused && !quizCompleted && !showSetup) {
@@ -198,19 +199,23 @@ const QuizApp = () => {
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [isQuizPaused, quizCompleted, showSetup, handlePauseToggle]);
 
-  // ---------- Answer Selection ----------
+  // Handle answer selection for the current question
   const handleAnswerSelect = (selectedAnswer) => {
     const currentQuestion = questions[currentQuestionIndex];
     const isCorrect = selectedAnswer === currentQuestion?.correct_answer;
-
     const answerData = {
       questionIndex: currentQuestionIndex,
       selectedAnswer,
       correctAnswer: currentQuestion?.correct_answer ?? null,
       isCorrect: Boolean(isCorrect),
+      isSkipped: false,
     };
 
-    setSelectedAnswers((prev) => [...prev, answerData]);
+    setSelectedAnswers((prev) => {
+      const copy = Array.from(prev || []);
+      copy[currentQuestionIndex] = answerData;
+      return copy;
+    });
     if (isCorrect) setScore((prev) => prev + 1);
 
     // Pause timer until result announcement (TTS)
@@ -218,15 +223,45 @@ const QuizApp = () => {
     setIsResultAnnouncementComplete(false);
   };
 
-  // ---------- Auto-advance after TTS ----------
+  // Auto-advance logic runs after result announcement (TTS finishes)
   useEffect(() => {
     if (isResultAnnouncementComplete && selectedAnswers[currentQuestionIndex]) {
       const moveToNext = () => {
-        if (currentQuestionIndex < questions.length - 1) {
-          setCurrentQuestionIndex((prev) => prev + 1);
+        const findNextPending = (from) => {
+          // Find next unanswered (no entry) first
+          for (let i = from + 1; i < questions.length; i++) {
+            const a = selectedAnswers[i];
+            if (!a || (a && a.isSkipped)) return i;
+          }
+          // If none ahead, look from start
+          for (let i = 0; i < questions.length; i++) {
+            const a = selectedAnswers[i];
+            if (!a || (a && a.isSkipped)) return i;
+          }
+          return -1;
+        };
+
+        const next = findNextPending(currentQuestionIndex);
+        if (next !== -1 && next !== currentQuestionIndex) {
+          setCurrentQuestionIndex(next);
           setIsTimerPaused(false);
           setIsResultAnnouncementComplete(false);
         } else {
+          // If no pending (all answered and none skipped), finish quiz
+          const anyPending = questions.some((_, idx) => {
+            const a = selectedAnswers[idx];
+            return !a || (a && a.isSkipped);
+          });
+          if (anyPending) {
+            // go to first pending (could be same index)
+            const firstPending = selectedAnswers.findIndex((a, i) => !a || (a && a.isSkipped));
+            if (firstPending !== -1) {
+              setCurrentQuestionIndex(firstPending);
+              setIsTimerPaused(false);
+              setIsResultAnnouncementComplete(false);
+              return;
+            }
+          }
           setQuizCompleted(true);
         }
       };
@@ -234,13 +269,54 @@ const QuizApp = () => {
     }
   }, [isResultAnnouncementComplete, currentQuestionIndex, questions.length, selectedAnswers]);
 
-  // ---------- Timer callbacks ----------
+  // Mark a question as skipped and advance to the next pending
+  const handleSkip = (questionIndex) => {
+    const qIndex = typeof questionIndex === 'number' ? questionIndex : currentQuestionIndex;
+    const currentQuestion = questions[qIndex];
+    if (!currentQuestion) return;
+
+    const skipData = {
+      questionIndex: qIndex,
+      selectedAnswer: null,
+      correctAnswer: currentQuestion.correct_answer || null,
+      isCorrect: false,
+      isSkipped: true,
+    };
+
+    setSelectedAnswers((prev) => {
+      const copy = Array.from(prev || []);
+      copy[qIndex] = skipData;
+      return copy;
+    });
+
+    // Move forward to next unanswered/skipped
+    const next = (() => {
+      for (let i = qIndex + 1; i < questions.length; i++) {
+        if (!selectedAnswers[i]) return i;
+      }
+      for (let i = 0; i < questions.length; i++) {
+        if (!selectedAnswers[i]) return i;
+      }
+      return -1;
+    })();
+
+    if (next !== -1) {
+      setCurrentQuestionIndex(next);
+    } else {
+      // If none unanswered, try to go to any skipped question
+      const firstSkipped = (selectedAnswers || []).findIndex((a) => a && a.isSkipped);
+      if (firstSkipped !== -1) setCurrentQuestionIndex(firstSkipped);
+      else setQuizCompleted(true);
+    }
+  };
+
+  // Timer callbacks forwarded to question/timer components
   const handleTimerExpired = () => handleAnswerSelect(null);
   const handleTimerWarning = () => console.log("Timer warning: 10 seconds remaining");
 
   const handleResultAnnounced = () => setIsResultAnnouncementComplete(true);
 
-  // ---------- Back to Setup ----------
+  // Reset everything and go back to setup screen
   const handleBackToSetup = useCallback(() => {
     QuizStateManager.clearQuizState();
     setQuestions([]);
@@ -256,7 +332,7 @@ const QuizApp = () => {
     setShowSetup(true);
   }, []);
 
-  // ---------- Restart Quiz ----------
+  // Restart: fetch a fresh set of questions
   const restartQuiz = () => {
     setCurrentQuestionIndex(0);
     setSelectedAnswers([]);
@@ -267,7 +343,7 @@ const QuizApp = () => {
     fetchQuestions();
   };
 
-  // ---------- Render ----------
+  // Render
   if (showSetup) return <QuizSetupPage onStart={() => setShowSetup(false)} />;
   if (isLoading) return <LoadingSpinner />;
 
@@ -306,6 +382,7 @@ const QuizApp = () => {
           totalQuestions={questions.length}
           onRestart={restartQuiz}
           onBackToSetup={handleBackToSetup}
+          skippedCount={selectedAnswers.filter((a) => a && a.isSkipped).length}
         />
       </>
     );
@@ -355,15 +432,64 @@ const QuizApp = () => {
           </div>
         </div>
 
-        {/* Progress Bar */}
-        <div className="bg-white/20 rounded-full h-3 mb-8 overflow-hidden">
-          <div
-            className="bg-gradient-to-r from-pink-400 to-indigo-500 h-full rounded-full transition-all duration-500 ease-out"
-            style={{
-              width: `${questions.length ? ((currentQuestionIndex + 1) / questions.length) * 100 : 0}%`,
-            }}
-          />
-        </div>
+        {/* Progress Bar (answered vs skipped) */}
+        {questions.length > 0 && (
+          (() => {
+            const answeredCount = selectedAnswers.filter((a) => a && !a.isSkipped).length;
+            const skippedCount = selectedAnswers.filter((a) => a && a.isSkipped).length;
+            const answeredWidth = ((answeredCount / questions.length) * 100) || 0;
+            const skippedWidth = ((skippedCount / questions.length) * 100) || 0;
+            return (
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-sm text-white">Answered: {answeredCount} / {questions.length}</div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-sm text-yellow-100">⏭️ Skipped: {skippedCount}</div>
+                    <button
+                      onClick={() => setShowSkippedList((s) => !s)}
+                      className="bg-white/10 text-white px-3 py-1 rounded-full text-sm hover:bg-white/20"
+                    >
+                      {showSkippedList ? 'Hide Skipped' : 'View Skipped'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-white/20 rounded-full h-3 mb-2 overflow-hidden relative">
+                  <div
+                    className="bg-green-400 h-full rounded-l-full transition-all duration-500"
+                    style={{ width: `${answeredWidth}%` }}
+                  />
+                  <div
+                    className="bg-yellow-400 h-full transition-all duration-500 absolute left-0"
+                    style={{ width: `${answeredWidth + skippedWidth}%`, clipPath: `inset(0 ${100 - (answeredWidth + skippedWidth)}% 0 ${answeredWidth}%)` }}
+                  />
+                </div>
+
+                {showSkippedList && (
+                  <div className="bg-white/10 p-3 rounded-lg text-white">
+                    <div className="text-sm font-semibold mb-2">Skipped Questions</div>
+                    <div className="flex gap-2 flex-wrap">
+                      {selectedAnswers.map((a, idx) => (
+                        a && a.isSkipped ? (
+                          <button
+                            key={idx}
+                            onClick={() => setCurrentQuestionIndex(idx)}
+                            className="bg-yellow-200 text-yellow-800 px-3 py-1 rounded-full text-sm font-semibold"
+                          >
+                            #{idx + 1}
+                          </button>
+                        ) : null
+                      ))}
+                      {selectedAnswers.filter((a) => a && a.isSkipped).length === 0 && (
+                        <div className="text-sm text-yellow-100">No skipped questions yet.</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()
+        )}
 
         {/* Countdown Timer */}
         {isTimerEnabled && timerDuration > 0 && (
@@ -397,6 +523,8 @@ const QuizApp = () => {
             selectedAnswer={selectedAnswers[currentQuestionIndex]?.selectedAnswer}
             isTimerEnabled={isTimerEnabled}
             onResultAnnounced={handleResultAnnounced}
+            onSkip={() => handleSkip(currentQuestionIndex)}
+            isSkipped={Boolean(selectedAnswers[currentQuestionIndex]?.isSkipped)}
           />
         )}
       </div>

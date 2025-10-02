@@ -10,10 +10,11 @@ const QuizQuestion = ({
   question,
   onAnswerSelect,
   selectedAnswer,
+  onSkip,
   isTimerEnabled,
   onResultAnnounced,
 }) => {
-  // Local state
+  // Component-local state for clicks, bookmarks, timers and TTS
   const [clickedAnswer, setClickedAnswer] = useState(null);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -38,7 +39,7 @@ const QuizQuestion = ({
     setTranscript,
   } = useVoice();
 
-  // Reset state when question changes
+  // Reset transient UI state when a new question loads
   useEffect(() => {
     setClickedAnswer(null);
     setIsTimedOut(false);
@@ -52,21 +53,21 @@ const QuizQuestion = ({
     setIsBookmarked(BookmarkManager.isBookmarked(questionId));
   }, [question]);
 
-  // Show result when answer selected or timed out
+  // Reveal feedback when an answer is selected or time runs out
   useEffect(() => {
     if ((selectedAnswer || clickedAnswer || isTimedOut) && !showResult) {
       setShowResult(true);
     }
   }, [selectedAnswer, clickedAnswer, isTimedOut]);
 
-  // Handle answer click
+  // Handle user clicking an answer
   const handleAnswerClick = (answer) => {
     if (selectedAnswer || isAnnouncingResult) return;
     setClickedAnswer(answer);
     onAnswerSelect(answer);
   };
 
-  // Timer expired
+  // Called when the per-question timer expires
   const handleTimeOut = () => {
     if (!selectedAnswer && !clickedAnswer) {
       setIsTimedOut(true);
@@ -74,13 +75,13 @@ const QuizQuestion = ({
     }
   };
 
-  // Bookmark toggle
+  // Toggle bookmark for this question
   const handleBookmarkToggle = () => {
     const result = BookmarkManager.toggleBookmark(question);
     if (result.success) setIsBookmarked(!isBookmarked);
   };
 
-  // Speak result
+  // Announce result via TTS (voice) and notify parent when done
   useEffect(() => {
     if (showResult && question && !hasResultBeenAnnounced) {
       const isCorrect = selectedAnswer === question.correct_answer;
@@ -105,7 +106,7 @@ const QuizQuestion = ({
     }
   }, [showResult, selectedAnswer, isTimedOut, question, hasResultBeenAnnounced]);
 
-  // Button classes
+  // Compute CSS classes for answer buttons based on state
   const getButtonClass = (answer) => {
     const base = "w-full p-4 text-left rounded-lg font-medium transition-all duration-300 transform ";
     if (!selectedAnswer && !clickedAnswer && !isTimedOut) {
@@ -119,6 +120,7 @@ const QuizQuestion = ({
     return base;
   };
 
+  // Small helper to show ✓/✗ icons next to answers
   const getAnswerIcon = (answer) => {
     if (!selectedAnswer && !clickedAnswer && !isTimedOut) return null;
     if (answer === question.correct_answer) return <span className="text-2xl">✓</span>;
@@ -129,6 +131,12 @@ const QuizQuestion = ({
   return (
     <>
       <div className="bg-white rounded-xl shadow-2xl p-8 max-w-3xl mx-auto relative" data-quiz-question="true">
+        {/* Skip badge */}
+        {question && question.isSkipped && (
+          <div className="absolute top-4 left-4 bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-semibold">
+            ⏭️ Skipped
+          </div>
+        )}
         {/* Voice Controls */}
         <div className="absolute top-4 right-4 z-10">
           <VoiceControls
@@ -233,6 +241,18 @@ const QuizQuestion = ({
             </div>
           </div>
         )}
+
+        {/* Footer actions: Skip */}
+        <div className="max-w-3xl mx-auto mt-4 flex justify-end gap-3 pr-4">
+          <button
+            onClick={() => onSkip && onSkip()}
+            disabled={selectedAnswer || clickedAnswer || isTimedOut || isAnnouncingResult}
+            className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Skip this question and return later"
+          >
+            ⏭️ Skip
+          </button>
+        </div>
       </div>
 
       {/* Voice Settings Modal */}
