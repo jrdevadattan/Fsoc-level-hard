@@ -11,6 +11,7 @@ import KeyboardShortcuts from "./KeyboardShortcuts";
 import PauseButton from "./PauseButton";
 import PauseOverlay from "./PauseOverlay";
 import QuizStateManager from "../utils/QuizStateManager";
+import BookmarkManager from "../utils/BookmarkManager";
 
 const QuizApp = () => {
     // core quiz state
@@ -161,12 +162,18 @@ const QuizApp = () => {
                 ];
                 const shuffledAnswers = answers.sort(() => Math.random() - 0.5);
 
-                return {
+                const processedQuestion = {
                     ...question,
                     question: decodeHtmlEntities(question.question),
                     correct_answer: decodeHtmlEntities(question.correct_answer),
                     answers: shuffledAnswers.map((a) => decodeHtmlEntities(a)),
                 };
+
+                // Generate unique ID for the question
+                processedQuestion.id =
+                    BookmarkManager.generateQuestionId(processedQuestion);
+
+                return processedQuestion;
             });
 
             setQuestions(processedQuestions);
