@@ -8,9 +8,9 @@ import QuizSetupPage from "./QuizSetupPage";
 import CountdownTimer from "./CountdownTimer";
 import TimerSettings from "./TimerSettings";
 import KeyboardShortcuts from "./KeyboardShortcuts";
-import PauseButton from "./PauseButton";
 import PauseOverlay from "./PauseOverlay";
 import QuizStateManager from "../utils/QuizStateManager";
+import BookmarkManager from "../utils/BookmarkManager";
 
 const QuizApp = () => {
     // core quiz state
@@ -161,12 +161,18 @@ const QuizApp = () => {
                 ];
                 const shuffledAnswers = answers.sort(() => Math.random() - 0.5);
 
-                return {
+                const processedQuestion = {
                     ...question,
                     question: decodeHtmlEntities(question.question),
                     correct_answer: decodeHtmlEntities(question.correct_answer),
                     answers: shuffledAnswers.map((a) => decodeHtmlEntities(a)),
                 };
+
+                // Generate unique ID for the question
+                processedQuestion.id =
+                    BookmarkManager.generateQuestionId(processedQuestion);
+
+                return processedQuestion;
             });
 
             setQuestions(processedQuestions);
@@ -187,6 +193,22 @@ const QuizApp = () => {
             setIsLoading(false);
         }
     }, [isTimerEnabled, timerDuration]);
+
+    // Function to handle going back to setup with proper cleanup
+    const handleBackToSetup = useCallback(() => {
+        QuizStateManager.clearQuizState();
+        setQuestions([]);
+        setCurrentQuestionIndex(0);
+        setSelectedAnswers([]);
+        setQuizCompleted(false);
+        setScore(0);
+        setError(null);
+        setIsQuizPaused(false);
+        setIsTimerPaused(false);
+        setTimeRemaining(null);
+        setQuizStartTime(null);
+        setShowSetup(true);
+    }, []);
 
     // load questions after user finishes setup
     useEffect(() => {
@@ -304,12 +326,20 @@ const QuizApp = () => {
                         Oops! Something went wrong
                     </h2>
                     <p className="text-gray-600 mb-6">{error}</p>
-                    <button
-                        onClick={fetchQuestions}
-                        className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200"
-                    >
-                        Try Again
-                    </button>
+                    <div className="space-y-3">
+                        <button
+                            onClick={fetchQuestions}
+                            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200"
+                        >
+                            Try Again
+                        </button>
+                        <button
+                            onClick={handleBackToSetup}
+                            className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-black font-bold py-3 px-6 rounded-lg transition-all duration-200"
+                        >
+                            ⚙️ Back to Setup
+                        </button>
+                    </div>
                 </div>
             </div>
         );
@@ -323,6 +353,7 @@ const QuizApp = () => {
                     score={score}
                     totalQuestions={questions.length}
                     onRestart={restartQuiz}
+                    onBackToSetup={handleBackToSetup}
                 />
             </>
         );
@@ -342,16 +373,40 @@ const QuizApp = () => {
                 totalQuestions={questions.length}
                 timeRemaining={timeRemaining}
                 score={score}
+                onBackToSetup={handleBackToSetup}
             />
 
             <div className="max-w-4xl mx-auto pt-4">
                 <div className="text-center mb-8 relative">
                     <div className="absolute top-0 left-0">
-                        <PauseButton
-                            isPaused={isQuizPaused}
-                            onTogglePause={handlePauseToggle}
-                            disabled={quizCompleted}
-                        />
+                        <button
+                            onClick={() => {
+                                if (
+                                    window.confirm(
+                                        "Are you sure you want to go back to setup? Your current progress will be lost.",
+                                    )
+                                ) {
+                                    handleBackToSetup();
+                                }
+                            }}
+                            className="bg-white/20 hover:bg-white/30 text-white p-3 rounded-lg transition-colors flex items-center gap-2 border border-white/30"
+                            title="Back to Setup"
+                        >
+                            <svg
+                                className="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M15 19l-7-7 7-7"
+                                />
+                            </svg>
+                            Setup
+                        </button>
                     </div>
 
                     <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">
@@ -362,7 +417,30 @@ const QuizApp = () => {
                         {selectedCategory || "this topic"} questions!
                     </p>
 
-                    <div className="absolute top-0 right-0">
+                    <div className="absolute top-0 right-0 flex gap-2">
+                        <button
+                            onClick={handlePauseToggle}
+                            disabled={quizCompleted}
+                            className={`
+                                flex items-center justify-center
+                                w-10 h-10 bg-white/20 hover:bg-white/30 text-white rounded-lg
+                                transition-all duration-200 backdrop-blur-sm border border-white/20 hover:border-white/40
+                                ${quizCompleted ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+                                touch-manipulation
+                            `}
+                            aria-label={
+                                isQuizPaused ? "Resume quiz" : "Pause quiz"
+                            }
+                            title={
+                                isQuizPaused
+                                    ? "Resume quiz (Spacebar)"
+                                    : "Pause quiz (Spacebar)"
+                            }
+                        >
+                            <span className="text-lg">
+                                {isQuizPaused ? "▶️" : "⏸️"}
+                            </span>
+                        </button>
                         <TimerSettings
                             currentDuration={timerDuration}
                             onDurationChange={setTimerDuration}
