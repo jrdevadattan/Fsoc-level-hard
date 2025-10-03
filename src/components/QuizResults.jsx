@@ -188,7 +188,6 @@ const QuizResults = ({
         );
     }
 
-
     return (
         <>
             {showAchievements && (
@@ -211,11 +210,6 @@ const QuizResults = ({
                     <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 mb-4 sm:mb-6">
                         Quiz Complete!
                     </h2>
-
-                <h2 className="text-3xl font-bold text-gray-800 mb-2">
-                    Quiz Complete!
-                </h2>
-
 
                     <div className="bg-gray-50 rounded-lg sm:rounded-xl p-4 sm:p-6 mb-6 sm:mb-8">
 
@@ -256,7 +250,6 @@ const QuizResults = ({
                             </div>
                         </div>
 
-
                         {/* Score breakdown - Responsive grid */}
                         <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-6 sm:mb-8">
                             <div className="bg-green-50 p-3 sm:p-4 rounded-lg">
@@ -276,25 +269,6 @@ const QuizResults = ({
                             <button
                                 onClick={onRestart}
                                 className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold py-3 sm:py-4 px-4 sm:px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg text-sm sm:text-base"
-
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 mb-8">
-                        <div className="bg-green-50 p-4 rounded-lg">
-                            <div className="text-2xl font-bold text-green-600">{score}</div>
-                            <div className="text-sm text-green-700">Correct</div>
-                        </div>
-                        <div className="bg-red-50 p-4 rounded-lg">
-                            <div className="text-2xl font-bold text-red-600">
-                                {totalQuestions - score}
-                            </div>
-                        </div>
-
-                        <div className="space-y-3 mb-8">
-                            <button
-                                onClick={onRestart}
-                                className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold py-4 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg"
-
                                 data-quiz-restart="true"
                             >
                                 🔄 Try Again
@@ -302,15 +276,10 @@ const QuizResults = ({
 
                             <button
                                 onClick={onBackToSetup}
-
                                 className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-black font-bold py-3 sm:py-4 px-4 sm:px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg text-sm sm:text-base"
-
-                                className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-black font-bold py-4 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg"
-
                             >
                                 ⚙️ Back to Setup
                             </button>
-
 
                             {/* Add Review Answers Button */}
                             <button
@@ -323,11 +292,6 @@ const QuizResults = ({
                             <button
                                 onClick={() => window.open("https://opentdb.com/", "_blank")}
                                 className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-3 px-4 sm:px-6 rounded-lg transition-colors duration-200 text-sm sm:text-base"
-
-                            <button
-                                onClick={() => window.open("https://opentdb.com/", "_blank")}
-                                className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-3 px-6 rounded-lg transition-colors duration-200"
-
                             >
                                 🌐 More Quizzes
                             </button>
@@ -383,48 +347,6 @@ const QuizResults = ({
                 </div>
             </div>
         </>
-
-                        <div className="mt-6">
-                            <p className="text-sm text-gray-500 mb-3">Share your results:</p>
-
-                        </div>
-                        <div className="space-y-3">
-                            <button
-                                onClick={handleDownloadPDF}
-                                className="w-full bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white font-bold py-4 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg"
-                            >
-                                📄 Download PDF
-                            </button>
-
-                            <button
-                                onClick={handleShareTwitter}
-                                className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg"
-                            >
-                                🐦 Share on Twitter
-                            </button>
-
-                            <button
-                                onClick={handleShareFacebook}
-                                className="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-4 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg"
-                            >
-                                📘 Share on Facebook
-                            </button>
-
-                            <button
-                                onClick={handleCopyLink}
-                                className="w-full bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-4 px-6 rounded-lg transition-colors duration-200"
-                            >
-                                🔗 Copy Shareable Link
-                            </button>
-                        </div>
-
-
-                    </div>
-                </div>
-
-            </div>
-        </div>
-
     )
 };
 

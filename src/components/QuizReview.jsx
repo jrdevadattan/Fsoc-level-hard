@@ -1,7 +1,4 @@
 import React, { useState } from 'react';
-import './QuizReview.css';
-import { FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
-
 
 const QuizReview = ({ questions, userAnswers, onBack }) => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
