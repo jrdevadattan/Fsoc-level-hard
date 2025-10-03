@@ -374,6 +374,19 @@ const QuizApp = () => {
         );
     }
     if (quizCompleted) {
+        const quizEndTime = Date.now();
+        const totalTimeSpent = quizStartTimestamp
+            ? (quizEndTime - quizStartTimestamp) / 1000
+            : 0;
+        const averageTimePerQuestion = totalTimeSpent / questions.length;
+
+        const quizResultData = {
+            timeSpent: totalTimeSpent,
+            averageTimePerQuestion,
+            startTime: quizStartTimestamp,
+            endTime: quizEndTime
+        };
+
         return (
             <>
                 <KeyboardShortcuts />
@@ -382,7 +395,7 @@ const QuizApp = () => {
                     totalQuestions={questions.length}
                     onRestart={restartQuiz}
                     onBackToSetup={handleBackToSetup}
-                    onReview={() => setReviewMode(true)}
+                    quizData={quizResultData}
                 />
             </>
         );
@@ -421,11 +434,10 @@ const QuizApp = () => {
                         <button
                             onClick={handlePauseToggle}
                             disabled={quizCompleted}
-                            className={`flex items-center justify-center w-10 h-10 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-all duration-200 backdrop-blur-sm border border-white/20 hover:border-white/40 ${
-                                quizCompleted
+                            className={`flex items-center justify-center w-10 h-10 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-all duration-200 backdrop-blur-sm border border-white/20 hover:border-white/40 ${quizCompleted
                                     ? "opacity-50 cursor-not-allowed"
                                     : "cursor-pointer"
-                            }`}
+                                }`}
                             aria-label={
                                 isQuizPaused ? "Resume quiz" : "Pause quiz"
                             }
