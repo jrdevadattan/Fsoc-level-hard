@@ -424,7 +424,6 @@ const QuizApp = () => {
   if (quizCompleted) {
     const timeSpent = quizStartTimestamp ? (Date.now() - quizStartTimestamp) / 1000 : 0;
     const avgTime = questions.length ? timeSpent / questions.length : 0;
-
     return (
       <>
         <KeyboardShortcuts />
