@@ -5,6 +5,39 @@ import { jsPDF } from "jspdf";
 const QuizResults = ({ score, totalQuestions, onRestart, onBackToSetup }) => {
     const percentage = Math.round((score / totalQuestions) * 100);
 
+    useEffect(() => {
+        BadgeManager.initializeBadgeSystem();
+
+        const earnedBadges = BadgeManager.onQuizCompleted({
+            score,
+            totalQuestions,
+            timeSpent: quizData.timeSpent || 0,
+            averageTimePerQuestion: quizData.averageTimePerQuestion || 30,
+        });
+
+        if (earnedBadges.length > 0) {
+            setNewBadges(earnedBadges);
+            setShowAchievements(true);
+        }
+    }, [score, totalQuestions, quizData]);
+
+    const handleShareResult = () => {
+        const shareText = `I just scored ${score}/${totalQuestions} (${percentage}%) on this quiz! 🎯`;
+
+        if (navigator.share) {
+            navigator.share({
+                title: "Quiz Results",
+                text: shareText,
+                url: window.location.href,
+            });
+        } else {
+            navigator.clipboard.writeText(shareText);
+            alert("Results copied to clipboard!");
+        }
+
+        BadgeManager.onResultShared();
+    };
+
     const getResultMessage = () => {
         if (percentage >= 90)
             return {
@@ -128,9 +161,9 @@ const handleDownloadPDF = () => {
 
                 <h2 className="text-3xl font-bold text-gray-800 mb-2">Quiz Complete!</h2>
 
-                <p className={`text-2xl font-semibold mb-6 ${result.color}`}>
-                    {result.message}
-                </p>
+                    <h2 className="text-3xl font-bold text-gray-800 mb-2">
+                        Quiz Complete!
+                    </h2>
 
                 <div className="bg-gray-50 rounded-xl p-6 mb-8">
                     <div className="text-6xl font-bold text-gray-800 mb-2">
@@ -166,8 +199,7 @@ const handleDownloadPDF = () => {
                         <div className="absolute inset-0 flex items-center justify-center">
                             <span className="text-2xl font-bold text-purple-600">{percentage}%</span>
                         </div>
-                    </div>
-                </div>
+                    )}
 
                 <div className="grid grid-cols-2 gap-4 mb-8">
                     <div className="bg-green-50 p-4 rounded-lg">
@@ -178,9 +210,7 @@ const handleDownloadPDF = () => {
                         <div className="text-2xl font-bold text-red-600">
                             {totalQuestions - score}
                         </div>
-                        <div className="text-sm text-red-700">Incorrect</div>
                     </div>
-                </div>
 
                 <div className="space-y-3 mb-8">
                     <button
@@ -242,7 +272,7 @@ const handleDownloadPDF = () => {
 
                
             </div>
-        </div>
+        </>
     );
 };
 
