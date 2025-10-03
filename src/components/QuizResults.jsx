@@ -1,9 +1,24 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import BadgeManager from "../utils/BadgeManager";
+import AchievementNotification from "./AchievementNotification";
+import QuizReview from "./QuizReview";
 import { jsPDF } from "jspdf";
 
-const QuizResults = ({ score, totalQuestions, onRestart, onBackToSetup }) => {
+const QuizResults = ({ 
+    score, 
+    totalQuestions, 
+    onRestart, 
+    onBackToSetup, 
+    quizData = {},
+    questions = [],
+    userAnswers = []
+}) => {
     const percentage = Math.round((score / totalQuestions) * 100);
+    const [newBadges, setNewBadges] = useState([]);
+    const [showAchievements, setShowAchievements] = useState(false);
+    const [showReview, setShowReview] = useState(false);
 
     useEffect(() => {
         BadgeManager.initializeBadgeSystem();
@@ -154,50 +169,46 @@ const handleDownloadPDF = () => {
         });
     };
 
-    return (
-        <div className="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center transform animate-pulse">
-                <div className="text-8xl mb-6 animate-bounce">{result.emoji}</div>
+    const handleReviewAnswers = () => {
+        setShowReview(true);
+    };
 
-                <h2 className="text-3xl font-bold text-gray-800 mb-2">Quiz Complete!</h2>
+    const handleBackFromReview = () => {
+        setShowReview(false);
+    };
 
                     <h2 className="text-3xl font-bold text-gray-800 mb-2">
                         Quiz Complete!
                     </h2>
 
-                <div className="bg-gray-50 rounded-xl p-6 mb-8">
-                    <div className="text-6xl font-bold text-gray-800 mb-2">
-                        {score}/{totalQuestions}
-                    </div>
-                    <div className="text-xl text-gray-600 mb-4">{percentage}% Correct</div>
+    return (
+        <>
+            {showAchievements && (
+                <AchievementNotification
+                    badges={newBadges}
+                    onClose={() => setShowAchievements(false)}
+                    onViewAll={() => {
+                        setShowAchievements(false);
+                        // Navigate to badges page if needed
+                    }}
+                />
+            )}
+            <div className="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center p-2 sm:p-4 md:p-6">
+                <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8 max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg w-full text-center">
 
-                    <div className="relative w-32 h-32 mx-auto mb-4">
-                        <svg
-                            className="w-32 h-32 transform -rotate-90"
-                            viewBox="0 0 120 120"
-                        >
-                            <circle
-                                cx="60"
-                                cy="60"
-                                r="50"
-                                fill="none"
-                                stroke="#e5e7eb"
-                                strokeWidth="8"
-                            />
-                            <circle
-                                cx="60"
-                                cy="60"
-                                r="50"
-                                fill="none"
-                                stroke="#8b5cf6"
-                                strokeWidth="8"
-                                strokeLinecap="round"
-                                strokeDasharray={`${(percentage / 100) * 314} 314`}
-                                className="transition-all duration-1000 ease-out"
-                            />
-                        </svg>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            <span className="text-2xl font-bold text-purple-600">{percentage}%</span>
+                    {/* Emoji - Responsive sizing */}
+                    <div className="text-4xl sm:text-6xl md:text-8xl mb-4 sm:mb-6 animate-bounce">{result.emoji}</div>
+
+                    {/* Title - Remove duplicate */}
+                    <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 mb-4 sm:mb-6">
+                        Quiz Complete!
+                    </h2>
+
+                    <div className="bg-gray-50 rounded-lg sm:rounded-xl p-4 sm:p-6 mb-6 sm:mb-8">
+
+                        {/* Score Display - Responsive */}
+                        <div className="text-3xl sm:text-4xl md:text-6xl font-bold text-gray-800 mb-2">
+                            {score}/{totalQuestions}
                         </div>
                     </div>
                 </div>
