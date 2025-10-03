@@ -13,6 +13,7 @@ import PauseOverlay from "./PauseOverlay";
 import QuizStateManager from "../utils/QuizStateManager";
 import BookmarkManager from "../utils/BookmarkManager";
 import BadgeManager from "../utils/BadgeManager";
+import ConsentManager from "../utils/ConsentManager";
 
 const QuizApp = () => {
     // ---------- Core Quiz State ----------
@@ -129,7 +130,7 @@ const QuizApp = () => {
             setIsLoading(true);
             setError(null);
 
-            const prefRaw = localStorage.getItem("quizPreferences");
+            const prefRaw = ConsentManager.getItem("quizPreferences");
             let prefs = null;
             if (prefRaw) {
                 try {
@@ -331,6 +332,14 @@ const QuizApp = () => {
         setIsResultAnnouncementComplete(false);
         fetchQuestions();
     };
+
+    // ---------- Analytics (simulated) ----------
+    useEffect(() => {
+        if (ConsentManager.hasConsent(ConsentManager.categories.analytics)) {
+            // Simulate an analytics pageview
+            console.debug('[analytics] pageview', { path: window.location.pathname });
+        }
+    }, []);
 
     // ---------- Render ----------
     if (showSetup) return <QuizSetupPage onStart={() => setShowSetup(false)} />;
