@@ -3,10 +3,23 @@
 import { useEffect, useState } from "react";
 import BadgeManager from "../utils/BadgeManager";
 import AchievementNotification from "./AchievementNotification";
-const QuizResults = ({ score, totalQuestions, onRestart, onBackToSetup, quizData = {} }) => {
+import QuizReview from "./QuizReview";
+import { jsPDF } from "jspdf";
+
+const QuizResults = ({ 
+    score, 
+    totalQuestions, 
+    onRestart, 
+    onBackToSetup, 
+    quizData = {},
+    questions = [],
+    userAnswers = []
+}) => {
     const percentage = Math.round((score / totalQuestions) * 100);
     const [newBadges, setNewBadges] = useState([]);
     const [showAchievements, setShowAchievements] = useState(false);
+    const [showReview, setShowReview] = useState(false);
+
     useEffect(() => {
         BadgeManager.initializeBadgeSystem();
 
@@ -156,6 +169,25 @@ const QuizResults = ({ score, totalQuestions, onRestart, onBackToSetup, quizData
         });
     };
 
+    const handleReviewAnswers = () => {
+        setShowReview(true);
+    };
+
+    const handleBackFromReview = () => {
+        setShowReview(false);
+    };
+
+    // If showing review, render QuizReview component
+    if (showReview) {
+        return (
+            <QuizReview
+                questions={questions}
+                userAnswers={userAnswers}
+                onBack={handleBackFromReview}
+            />
+        );
+    }
+
     return (
         <>
             {showAchievements && (
@@ -247,6 +279,14 @@ const QuizResults = ({ score, totalQuestions, onRestart, onBackToSetup, quizData
                                 className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-black font-bold py-3 sm:py-4 px-4 sm:px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg text-sm sm:text-base"
                             >
                                 ⚙️ Back to Setup
+                            </button>
+
+                            {/* Add Review Answers Button */}
+                            <button
+                                onClick={handleReviewAnswers}
+                                className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-3 sm:py-4 px-4 sm:px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg text-sm sm:text-base"
+                            >
+                                📝 Review Answers
                             </button>
 
                             <button
