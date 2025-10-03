@@ -199,7 +199,8 @@ const handleDownloadPDF = () => {
                         <div className="absolute inset-0 flex items-center justify-center">
                             <span className="text-2xl font-bold text-purple-600">{percentage}%</span>
                         </div>
-                    )}
+                    </div>
+                </div>
 
                 <div className="grid grid-cols-2 gap-4 mb-8">
                     <div className="bg-green-50 p-4 rounded-lg">
@@ -268,11 +269,10 @@ const handleDownloadPDF = () => {
                     >
                         🔗 Copy Shareable Link
                     </button>
+                    </div>
                 </div>
-
-               
             </div>
-        </>
+        </div>
     );
 };
 
