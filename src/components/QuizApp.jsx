@@ -10,6 +10,7 @@ import CountdownTimer from "./CountdownTimer";
 import TimerSettings from "./TimerSettings";
 import KeyboardShortcuts from "./KeyboardShortcuts";
 import PauseOverlay from "./PauseOverlay";
+import ThemeToggle from "./ThemeToggle";
 import QuizStateManager from "../utils/QuizStateManager";
 import BookmarkManager from "../utils/BookmarkManager";
 import BadgeManager from "../utils/BadgeManager";
@@ -422,7 +423,7 @@ const QuizApp = () => {
                     </p>
 
                     {/* Timer / Settings */}
-                    <div className="absolute top-0 right-0 flex gap-2">
+                    <div className="absolute top-0 right-0 flex gap-2 items-center">
                         <button
                             onClick={handlePauseToggle}
                             disabled={quizCompleted}
@@ -443,6 +444,7 @@ const QuizApp = () => {
                                 {isQuizPaused ? "▶️" : "⏸️"}
                             </span>
                         </button>
+                        <ThemeToggle className="bg-white/20 text-white hover:bg-white/30" />
                         <TimerSettings
                             currentDuration={timerDuration}
                             onDurationChange={setTimerDuration}
