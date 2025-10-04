@@ -301,7 +301,7 @@ const QuizApp = () => {
       }
       setTimeout(moveToNext, 300)
     }
-  }, [isResultAnnouncementComplete, currentQuestionIndex, questions.length, selectedAnswers])
+  }, [isResultAnnouncementComplete, currentQuestionIndex, questions.length, selectedAnswers, score, quizStartTimestamp, totalHintsUsed])
 
   // ---------- Timer callbacks ----------
   const handleTimerExpired = () => handleAnswerSelect(null)
@@ -388,6 +388,12 @@ const QuizApp = () => {
           totalQuestions={questions.length}
           onRestart={restartQuiz}
           onBackToSetup={handleBackToSetup}
+          quizData={{
+            timeSpent: quizStartTimestamp ? (Date.now() - quizStartTimestamp) / 1000 : 0,
+            averageTimePerQuestion: questions.length > 0 ? (quizStartTimestamp ? (Date.now() - quizStartTimestamp) / 1000 : 0) / questions.length : 0,
+          }}
+          questions={questions}
+          userAnswers={selectedAnswers}
         />
       </>
     )
@@ -410,24 +416,37 @@ const QuizApp = () => {
       <div className="max-w-4xl mx-auto pt-4">
         {/* Header */}
         <div className="text-center mb-8 relative">
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">Quiz Challenge</h1>
+          <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">
+            Quiz Challenge
+          </h1>
           <p className="text-purple-200 text-lg">
-            Test your knowledge with {selectedCategory || "this topic"} questions!
+            Test your knowledge with{" "}
+            {selectedCategory || "this topic"} questions!
           </p>
 
           {/* Timer / Settings */}
-          <div className="absolute top-0 right-0 flex gap-2">
+          <div className="absolute top-0 right-0 flex gap-2 items-center">
             <button
               onClick={handlePauseToggle}
               disabled={quizCompleted}
-              className={`flex items-center justify-center w-10 h-10 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-all duration-200 backdrop-blur-sm border border-white/20 hover:border-white/40 ${
-                quizCompleted ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-              }`}
-              aria-label={isQuizPaused ? "Resume quiz" : "Pause quiz"}
-              title={isQuizPaused ? "Resume quiz (Spacebar)" : "Pause quiz (Spacebar)"}
+              className={`flex items-center justify-center w-10 h-10 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-all duration-200 backdrop-blur-sm border border-white/20 hover:border-white/40 ${quizCompleted
+                  ? "opacity-50 cursor-not-allowed"
+                  : "cursor-pointer"
+                }`}
+              aria-label={
+                isQuizPaused ? "Resume quiz" : "Pause quiz"
+              }
+              title={
+                isQuizPaused
+                  ? "Resume quiz (Spacebar)"
+                  : "Pause quiz (Spacebar)"
+              }
             >
-              <span className="text-lg">{isQuizPaused ? "▶️" : "⏸️"}</span>
+              <span className="text-lg">
+                {isQuizPaused ? "▶️" : "⏸️"}
+              </span>
             </button>
+            <ThemeToggle className="bg-white/20 text-white hover:bg-white/30" />
             <TimerSettings
               currentDuration={timerDuration}
               onDurationChange={setTimerDuration}
@@ -437,98 +456,39 @@ const QuizApp = () => {
           </div>
         </div>
 
-            <div className="max-w-4xl mx-auto pt-4">
-                {/* Header */}
-                <div className="text-center mb-8 relative">
-                    <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">
-                        Quiz Challenge
-                    </h1>
-                    <p className="text-purple-200 text-lg">
-                        Test your knowledge with{" "}
-                        {selectedCategory || "this topic"} questions!
-                    </p>
+        {/* Progress Bar */}
+        <div className="bg-white/20 rounded-full h-3 mb-8 overflow-hidden">
+          <div
+            className="bg-gradient-to-r from-pink-400 to-indigo-500 h-full rounded-full transition-all duration-500 ease-out"
+            style={{
+              width: `${questions.length ? ((currentQuestionIndex + 1) / questions.length) * 100 : 0}%`,
+            }}
+          />
+        </div>
 
-                    {/* Timer / Settings */}
-                    <div className="absolute top-0 right-0 flex gap-2 items-center">
-                        <button
-                            onClick={handlePauseToggle}
-                            disabled={quizCompleted}
-                            className={`flex items-center justify-center w-10 h-10 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-all duration-200 backdrop-blur-sm border border-white/20 hover:border-white/40 ${quizCompleted
-                                ? "opacity-50 cursor-not-allowed"
-                                : "cursor-pointer"
-                                }`}
-                            aria-label={
-                                isQuizPaused ? "Resume quiz" : "Pause quiz"
-                            }
-                            title={
-                                isQuizPaused
-                                    ? "Resume quiz (Spacebar)"
-                                    : "Pause quiz (Spacebar)"
-                            }
-                        >
-                            <span className="text-lg">
-                                {isQuizPaused ? "▶️" : "⏸️"}
-                            </span>
-                        </button>
-                        <ThemeToggle className="bg-white/20 text-white hover:bg-white/30" />
-                        <TimerSettings
-                            currentDuration={timerDuration}
-                            onDurationChange={setTimerDuration}
-                            isTimerEnabled={isTimerEnabled}
-                            onTimerToggle={setIsTimerEnabled}
-                        />
-                    </div>
-                </div>
+        {/* Countdown Timer */}
+        {isTimerEnabled && timerDuration > 0 && (
+          <div className="mb-6">
+            <CountdownTimer
+              duration={timerDuration}
+              onTimeUp={handleTimerExpired}
+              isActive={!quizCompleted}
+              isPaused={isTimerPaused || isQuizPaused}
+              onWarning={handleTimerWarning}
+              showWarningAt={10}
+              initialTimeRemaining={timeRemaining}
+              onTimeUpdate={setTimeRemaining}
+              key={`timer-${currentQuestionIndex}`}
+            />
+          </div>
+        )}
 
-                {/* Progress Bar */}
-                <div className="bg-white/20 rounded-full h-3 mb-8 overflow-hidden">
-                    <div
-                        className="bg-gradient-to-r from-pink-400 to-indigo-500 h-full rounded-full transition-all duration-500 ease-out"
-                        style={{
-                            width: `${questions.length ? ((currentQuestionIndex + 1) / questions.length) * 100 : 0}%`,
-                        }}
-                    />
-                </div>
-
-                {/* Countdown Timer */}
-                {isTimerEnabled && timerDuration > 0 && (
-                    <div className="mb-6">
-                        <CountdownTimer
-                            duration={timerDuration}
-                            onTimeUp={handleTimerExpired}
-                            isActive={!quizCompleted}
-                            isPaused={isTimerPaused || isQuizPaused}
-                            onWarning={handleTimerWarning}
-                            showWarningAt={10}
-                            initialTimeRemaining={timeRemaining}
-                            onTimeUpdate={setTimeRemaining}
-                            key={`timer-${currentQuestionIndex}`}
-                        />
-                    </div>
-                )}
-
-                {/* Question Counter */}
-                <div className="text-center mb-6">
-                    <span className="bg-white/20 text-white px-4 py-2 rounded-full text-lg font-semibold">
-                        Question {currentQuestionIndex + 1} of{" "}
-                        {questions.length || 0}
-                    </span>
-                </div>
-
-                {/* Current Question */}
-                {questions.length > 0 && !isQuizPaused && (
-                    <QuizQuestion
-                        question={questions[currentQuestionIndex]}
-                        onAnswerSelect={handleAnswerSelect}
-                        selectedAnswer={
-                            selectedAnswers[currentQuestionIndex]
-                                ?.selectedAnswer
-                        }
-                        isTimerEnabled={isTimerEnabled}
-                        onResultAnnounced={handleResultAnnounced}
-                    />
-                )}
-            </div>
+        {/* Question Counter */}
+        <div className="text-center mb-6">
+          <span className="bg-white/20 text-white px-4 py-2 rounded-full text-lg font-semibold">
+            Question {currentQuestionIndex + 1} of{" "}
+            {questions.length || 0}
+          </span>
         </div>
 
         {/* Current Question */}
@@ -536,7 +496,10 @@ const QuizApp = () => {
           <QuizQuestion
             question={questions[currentQuestionIndex]}
             onAnswerSelect={handleAnswerSelect}
-            selectedAnswer={selectedAnswers[currentQuestionIndex]?.selectedAnswer}
+            selectedAnswer={
+              selectedAnswers[currentQuestionIndex]
+                ?.selectedAnswer
+            }
             isTimerEnabled={isTimerEnabled}
             onResultAnnounced={handleResultAnnounced}
             hintsRemaining={hintsRemaining}
