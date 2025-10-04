@@ -14,7 +14,6 @@ import BookmarkManager from "../utils/BookmarkManager";
 import BadgeManager from "../utils/BadgeManager";
 
 const QuizApp = () => {
-    // ---------- Core Quiz State ----------
     const [questions, setQuestions] = useState([]);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [selectedAnswers, setSelectedAnswers] = useState([]);
@@ -22,41 +21,27 @@ const QuizApp = () => {
     const [score, setScore] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
-
-    // ---------- Quiz Setup State ----------
     const [showSetup, setShowSetup] = useState(true);
     const [selectedCategory, setSelectedCategory] = useState("");
-
-    // ---------- Timer State ----------
     const [timerDuration, setTimerDuration] = useState(30);
     const [isTimerEnabled, setIsTimerEnabled] = useState(true);
     const [isTimerPaused, setIsTimerPaused] = useState(false);
     const [timeRemaining, setTimeRemaining] = useState(null);
-
-    // ---------- Pause State ----------
     const [isQuizPaused, setIsQuizPaused] = useState(false);
     const [quizStartTime, setQuizStartTime] = useState(null);
-
-    // ---------- TTS / Result Announcement ----------
-    const [isResultAnnouncementComplete, setIsResultAnnouncementComplete] =
-        useState(false);
-
-    // ---------- Badge System ----------
+    const [isResultAnnouncementComplete, setIsResultAnnouncementComplete] = useState(false);
     const [quizStartTimestamp, setQuizStartTimestamp] = useState(null);
 
-    // ---------- Helper to decode HTML entities ----------
     const decodeHtmlEntities = (text) => {
         const textarea = document.createElement("textarea");
         textarea.innerHTML = text;
         return textarea.value;
     };
 
-    // ---------- Initialize Badge System ----------
     useEffect(() => {
         BadgeManager.initializeBadgeSystem();
     }, []);
 
-    // ---------- Save / Load Quiz State ----------
     const saveQuizState = useCallback(() => {
         if (questions.length === 0) return;
 
@@ -103,7 +88,6 @@ const QuizApp = () => {
         return true;
     }, []);
 
-    // ---------- Handle Pause / Resume ----------
     const handlePauseToggle = useCallback(() => {
         if (quizCompleted || showSetup) return;
 
@@ -118,7 +102,6 @@ const QuizApp = () => {
         }
     }, [isQuizPaused, quizCompleted, showSetup, saveQuizState]);
 
-    // ---------- Fetch Questions ----------
     const fetchQuestions = useCallback(async () => {
         try {
             setIsLoading(true);
@@ -187,7 +170,6 @@ const QuizApp = () => {
         }
     }, [timerDuration, isTimerEnabled]);
 
-    // ---------- Auto-save every 5s ----------
     useEffect(() => {
         if (
             !isQuizPaused &&
@@ -206,7 +188,6 @@ const QuizApp = () => {
         saveQuizState,
     ]);
 
-    // ---------- Load saved state or fetch questions after setup ----------
     useEffect(() => {
         if (!showSetup) {
             const hasSavedState = loadSavedQuizState();
@@ -214,7 +195,6 @@ const QuizApp = () => {
         }
     }, [showSetup, loadSavedQuizState, fetchQuestions]);
 
-    // ---------- Auto-pause on visibility change ----------
     useEffect(() => {
         const handleVisibilityChange = () => {
             if (
@@ -234,7 +214,6 @@ const QuizApp = () => {
             );
     }, [isQuizPaused, quizCompleted, showSetup, handlePauseToggle]);
 
-    // ---------- Answer Selection ----------
     const handleAnswerSelect = (selectedAnswer) => {
         const currentQuestion = questions[currentQuestionIndex];
         const isCorrect = selectedAnswer === currentQuestion?.correct_answer;
@@ -249,12 +228,10 @@ const QuizApp = () => {
         setSelectedAnswers((prev) => [...prev, answerData]);
         if (isCorrect) setScore((prev) => prev + 1);
 
-        // Pause timer until result announcement (TTS)
         setIsTimerPaused(true);
         setIsResultAnnouncementComplete(false);
     };
 
-    // ---------- Auto-advance after TTS ----------
     useEffect(() => {
         if (
             isResultAnnouncementComplete &&
@@ -268,7 +245,6 @@ const QuizApp = () => {
                 } else {
                     setQuizCompleted(true);
 
-                    // Track quiz completion for badges
                     const quizEndTime = Date.now();
                     const totalTimeSpent = quizStartTimestamp
                         ? (quizEndTime - quizStartTimestamp) / 1000
@@ -291,16 +267,16 @@ const QuizApp = () => {
         currentQuestionIndex,
         questions.length,
         selectedAnswers,
+        quizStartTimestamp,
+        score,
     ]);
 
-    // ---------- Timer callbacks ----------
     const handleTimerExpired = () => handleAnswerSelect(null);
     const handleTimerWarning = () =>
         console.log("Timer warning: 10 seconds remaining");
 
     const handleResultAnnounced = () => setIsResultAnnouncementComplete(true);
 
-    // ---------- Back to Setup ----------
     const handleBackToSetup = useCallback(() => {
         QuizStateManager.clearQuizState();
         setQuestions([]);
@@ -316,7 +292,6 @@ const QuizApp = () => {
         setShowSetup(true);
     }, []);
 
-    // ---------- Restart Quiz ----------
     const restartQuiz = () => {
         setCurrentQuestionIndex(0);
         setSelectedAnswers([]);
@@ -327,7 +302,6 @@ const QuizApp = () => {
         fetchQuestions();
     };
 
-    // ---------- Render ----------
     if (showSetup) return <QuizSetupPage onStart={() => setShowSetup(false)} />;
     if (isLoading) return <LoadingSpinner />;
 
@@ -391,7 +365,6 @@ const QuizApp = () => {
             />
 
             <div className="max-w-4xl mx-auto pt-4">
-                {/* Header */}
                 <div className="text-center mb-8 relative">
                     <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">
                         Quiz Challenge
@@ -401,7 +374,6 @@ const QuizApp = () => {
                         {selectedCategory || "this topic"} questions!
                     </p>
 
-                    {/* Timer / Settings */}
                     <div className="absolute top-0 right-0 flex gap-2">
                         <button
                             onClick={handlePauseToggle}
@@ -433,7 +405,6 @@ const QuizApp = () => {
                     </div>
                 </div>
 
-                {/* Progress Bar */}
                 <div className="bg-white/20 rounded-full h-3 mb-8 overflow-hidden">
                     <div
                         className="bg-gradient-to-r from-pink-400 to-indigo-500 h-full rounded-full transition-all duration-500 ease-out"
@@ -443,7 +414,6 @@ const QuizApp = () => {
                     />
                 </div>
 
-                {/* Countdown Timer */}
                 {isTimerEnabled && timerDuration > 0 && (
                     <div className="mb-6">
                         <CountdownTimer
@@ -460,7 +430,6 @@ const QuizApp = () => {
                     </div>
                 )}
 
-                {/* Question Counter */}
                 <div className="text-center mb-6">
                     <span className="bg-white/20 text-white px-4 py-2 rounded-full text-lg font-semibold">
                         Question {currentQuestionIndex + 1} of{" "}
@@ -468,7 +437,6 @@ const QuizApp = () => {
                     </span>
                 </div>
 
-                {/* Current Question */}
                 {questions.length > 0 && !isQuizPaused && (
                     <QuizQuestion
                         question={questions[currentQuestionIndex]}

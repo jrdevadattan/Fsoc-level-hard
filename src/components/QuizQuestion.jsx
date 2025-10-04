@@ -14,7 +14,6 @@ const QuizQuestion = ({
     isTimerEnabled,
     onResultAnnounced,
 }) => {
-    // Local state
     const [clickedAnswer, setClickedAnswer] = useState(null);
     const [isBookmarked, setIsBookmarked] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -42,7 +41,6 @@ const QuizQuestion = ({
         setTranscript,
     } = useVoice();
 
-    // Reset state when question changes
     useEffect(() => {
         setClickedAnswer(null);
         setIsTimedOut(false);
@@ -58,54 +56,39 @@ const QuizQuestion = ({
         setIsBookmarked(BookmarkManager.isBookmarked(questionId));
         setHintsUsed(0);
         setShowHint(false);
-    }, [question]);
+    }, [question, stopSpeaking, setTranscript]);
 
-    // Show result when answer selected or timed out
     useEffect(() => {
         if ((selectedAnswer || clickedAnswer || isTimedOut) && !showResult) {
             setShowResult(true);
         }
-    }, [selectedAnswer, clickedAnswer, isTimedOut]);
+    }, [selectedAnswer, clickedAnswer, isTimedOut, showResult]);
 
-    // Handle answer click
     const handleAnswerClick = (answer) => {
         if (selectedAnswer || isAnnouncingResult) return;
 
-        // Track answer timing for badges
         const answerTime = questionStartTime
             ? (Date.now() - questionStartTime) / 1000
             : 0;
         const isCorrect = answer === question.correct_answer;
 
-        // Check for speed and streak badges
         BadgeManager.onAnswerSubmitted(isCorrect, answerTime);
 
         setClickedAnswer(answer);
         onAnswerSelect(answer);
     };
 
-    // Timer expired
-    const handleTimeOut = () => {
-        if (!selectedAnswer && !clickedAnswer) {
-            setIsTimedOut(true);
-            onAnswerSelect(null);
-        }
-    };
-
-    // Hint system
     const handleHintRequest = () => {
         if (hintsUsed < 2 && !selectedAnswer && !clickedAnswer && !isTimedOut) {
             setHintsUsed((prev) => prev + 1);
             setShowHint(true);
 
-            // Track hint usage for badges
             BadgeManager.onHintUsed();
         }
     };
 
     const getHintText = () => {
         if (hintsUsed === 1) {
-            // First hint: eliminate wrong answers
             const wrongAnswers = question.answers.filter(
                 (answer) => answer !== question.correct_answer,
             );
@@ -113,25 +96,21 @@ const QuizQuestion = ({
             const toEliminate = wrongAnswers.slice(0, eliminateCount);
             return `Hint: The answer is NOT "${toEliminate.join('" or "')}"`;
         } else if (hintsUsed === 2) {
-            // Second hint: give category clue
             return `Hint: This is related to ${question.category}. Think about the key concepts in this field.`;
         }
         return "";
     };
 
-    // Bookmark toggle
     const handleBookmarkToggle = () => {
         const result = BookmarkManager.toggleBookmark(question);
         if (result.success) {
             setIsBookmarked(!isBookmarked);
-            // Track bookmark for badges
             if (result.action === "added") {
                 BadgeManager.onBookmarkAdded();
             }
         }
     };
 
-    // Speak result
     useEffect(() => {
         if (showResult && question && !hasResultBeenAnnounced) {
             const isCorrect = selectedAnswer === question.correct_answer;
@@ -162,9 +141,10 @@ const QuizQuestion = ({
         isTimedOut,
         question,
         hasResultBeenAnnounced,
+        speak,
+        onResultAnnounced,
     ]);
 
-    // Button classes
     const getButtonClass = (answer) => {
         const base =
             "w-full p-4 text-left rounded-lg font-medium transition-all duration-300 transform ";
@@ -205,7 +185,6 @@ const QuizQuestion = ({
                 className="bg-white rounded-xl shadow-2xl p-8 max-w-3xl mx-auto relative"
                 data-quiz-question="true"
             >
-                {/* Voice Controls */}
                 <div className="absolute top-4 right-4 z-10">
                     <VoiceControls
                         question={question}
@@ -228,7 +207,6 @@ const QuizQuestion = ({
                     />
                 </div>
 
-                {/* Header */}
                 <div className="mb-8 pr-48 flex justify-between items-start">
                     <div>
                         <div className="flex items-center gap-3 mb-4">
@@ -243,7 +221,6 @@ const QuizQuestion = ({
                             {question.question}
                         </h2>
 
-                        {/* Badges */}
                         <div className="flex items-center gap-2 mt-4 flex-wrap">
                             <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
                                 {question.difficulty}
@@ -270,7 +247,6 @@ const QuizQuestion = ({
                         </div>
                     </div>
 
-                    {/* Bookmark and Hint */}
                     <div className="flex gap-2">
                         <button
                             onClick={handleHintRequest}
@@ -333,7 +309,6 @@ const QuizQuestion = ({
                     </div>
                 </div>
 
-                {/* Hint Display */}
                 {showHint && hintsUsed > 0 && (
                     <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg animate-fadeInUp">
                         <div className="flex items-center gap-2 mb-2">
@@ -346,7 +321,6 @@ const QuizQuestion = ({
                     </div>
                 )}
 
-                {/* Answers */}
                 <div className="space-y-4">
                     {question.answers.map((answer, index) => (
                         <button
@@ -375,7 +349,6 @@ const QuizQuestion = ({
                     ))}
                 </div>
 
-                {/* Result */}
                 {(selectedAnswer || clickedAnswer || isTimedOut) && (
                     <div className="mt-6 p-4 rounded-lg bg-gray-50">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -423,7 +396,6 @@ const QuizQuestion = ({
                 )}
             </div>
 
-            {/* Voice Settings Modal */}
             <VoiceSettings
                 isOpen={isSettingsOpen}
                 onClose={() => setIsSettingsOpen(false)}

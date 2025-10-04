@@ -16,18 +16,15 @@ const VoiceControls = ({
   parseVoiceAnswer,
   setTranscript,
   isTimedOut,
-  showResult,
-  isAnnouncingResult
+  showResult
 }) => {
-  // Automatically read out the question and options when a new question appears
   useEffect(() => {
     if (question && !selectedAnswer && !isTimedOut && !showResult) {
       const text = `${question.category}. ${question.question}. The options are: ${question.answers.map((ans, idx) => `${String.fromCharCode(65 + idx)}, ${ans}`).join('. ')}`;
       onSpeak(text);
     }
-  }, [question?.question]);
+  }, [question?.question, selectedAnswer, isTimedOut, showResult, question, onSpeak]);
 
-  // Listen for voice input and select answer if recognized
   useEffect(() => {
     if (transcript && question && !selectedAnswer && !isTimedOut && !showResult) {
       const answer = parseVoiceAnswer(transcript, question.answers);
@@ -40,9 +37,8 @@ const VoiceControls = ({
         setTranscript('');
       }
     }
-  }, [transcript]);
+  }, [transcript, question, selectedAnswer, isTimedOut, showResult, parseVoiceAnswer, onAnswerSelect, onSpeak, setTranscript]);
 
-  // Handle clicking the "read question" button
   const handleSoundClick = () => {
     if (isSpeaking) {
       onStopSpeaking();
@@ -52,7 +48,6 @@ const VoiceControls = ({
     }
   }
 
-  // Handle clicking the microphone button
   const handleMicClick = () => {
     if (isListening) {
       onStopListening();
@@ -67,7 +62,6 @@ const VoiceControls = ({
 
   return (
     <div className="flex gap-2 items-start">
-      {/* Speak Question Button */}
       <button
         onClick={handleSoundClick}
         disabled={!question || showResult}
@@ -89,7 +83,6 @@ const VoiceControls = ({
         )}
       </button>
 
-      {/* Voice Answer Button */}
       <button
         onClick={handleMicClick}
         disabled={!question || selectedAnswer || isTimedOut || showResult}
@@ -116,7 +109,6 @@ const VoiceControls = ({
         )}
       </button>
 
-      {/* Open Voice Settings */}
       <button
         onClick={onOpenSettings}
         className="p-3 rounded-full bg-gray-700 hover:bg-gray-800 hover:scale-110 transition-all duration-300 shadow-lg"
@@ -127,14 +119,12 @@ const VoiceControls = ({
         </svg>
       </button>
 
-      {/* Indicator for active listening */}
       {isListening && (
         <div className="absolute top-full right-0 mt-2 bg-red-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-lg animate-pulse whitespace-nowrap">
           🎤 Listening...
         </div>
       )}
 
-      {/* Display the transcript while user is speaking */}
       {transcript && (
         <div className="absolute top-full right-0 mt-2 bg-blue-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-lg whitespace-nowrap">
           "{transcript}"
