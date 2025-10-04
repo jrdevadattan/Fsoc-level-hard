@@ -1,5 +1,6 @@
 const QUIZ_STATE_KEY = 'quizPausedState'
 const QUIZ_STATE_EXPIRY_HOURS = 24
+import ConsentManager from './ConsentManager'
 
 class QuizStateManager {
   static saveQuizState(state) {
@@ -10,7 +11,7 @@ class QuizStateManager {
         expiresAt: Date.now() + (QUIZ_STATE_EXPIRY_HOURS * 60 * 60 * 1000)
       }
 
-      localStorage.setItem(QUIZ_STATE_KEY, JSON.stringify(stateWithTimestamp))
+      ConsentManager.setItem(QUIZ_STATE_KEY, JSON.stringify(stateWithTimestamp), ConsentManager.categories.essential)
       return true
     } catch (error) {
       console.warn('Failed to save quiz state:', error)
@@ -20,7 +21,7 @@ class QuizStateManager {
 
   static loadQuizState() {
     try {
-      const savedState = localStorage.getItem(QUIZ_STATE_KEY)
+      const savedState = ConsentManager.getItem(QUIZ_STATE_KEY)
       if (!savedState) return null
 
       const state = JSON.parse(savedState)
@@ -47,7 +48,7 @@ class QuizStateManager {
 
   static clearQuizState() {
     try {
-      localStorage.removeItem(QUIZ_STATE_KEY)
+      ConsentManager.removeItem(QUIZ_STATE_KEY)
       return true
     } catch (error) {
       console.warn('Failed to clear quiz state:', error)
