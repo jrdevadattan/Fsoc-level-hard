@@ -4,7 +4,7 @@ import React from 'react'
 const CookiePolicy = () => {
   const lastUpdated = new Date().toISOString().split('T')[0]
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 p-4">
+<div className="min-h-screen theme-screen p-4">
       <div className="max-w-3xl mx-auto bg-white/95 backdrop-blur rounded-2xl shadow-xl border border-white/20 p-6">
         <h1 className="text-3xl font-bold text-gray-800">Cookie Policy</h1>
         <div className="text-sm text-gray-500">Last updated: {lastUpdated}</div>

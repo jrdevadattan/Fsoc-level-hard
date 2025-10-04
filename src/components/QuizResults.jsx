@@ -6,6 +6,10 @@ import AchievementNotification from "./AchievementNotification";
 import QuizReview from "./QuizReview";
 import { jsPDF } from "jspdf";
 
+import BonusSpinWheel from "./BonusSpinWheel";
+import { computeBasePoints, applyBonus } from "../utils/Points";
+import BonusManager from "../utils/BonusManager";
+
 const QuizResults = ({ 
     score, 
     totalQuestions, 
@@ -15,12 +19,18 @@ const QuizResults = ({
     questions = [],
     userAnswers = []
 }) => {
-    const percentage = Math.round((score / totalQuestions) * 100);
+const percentage = Math.round((score / totalQuestions) * 100);
     const [newBadges, setNewBadges] = useState([]);
     const [showAchievements, setShowAchievements] = useState(false);
     const [showReview, setShowReview] = useState(false);
 
-    useEffect(() => {
+    // Points and bonus
+    const basePoints = computeBasePoints(questions, userAnswers);
+    const [bonusReward, setBonusReward] = useState(null);
+    const [finalPoints, setFinalPoints] = useState(basePoints);
+const [showWheel, setShowWheel] = useState(BonusManager.canSpin());
+
+useEffect(() => {
         BadgeManager.initializeBadgeSystem();
 
         const earnedBadges = BadgeManager.onQuizCompleted({
@@ -34,7 +44,10 @@ const QuizResults = ({
             setNewBadges(earnedBadges);
             setShowAchievements(true);
         }
-    }, [score, totalQuestions, quizData]);
+
+        // initialize final points as base (before spin)
+        setFinalPoints(basePoints);
+    }, [score, totalQuestions, quizData, basePoints]);
 
     const handleShareResult = () => {
         const shareText = `I just scored ${score}/${totalQuestions} (${percentage}%) on this quiz! 🎯`;
@@ -186,6 +199,33 @@ const QuizResults = ({
 
     return (
         <>
+{showWheel && (
+                <BonusSpinWheel
+                    isOpen={showWheel}
+                    quizScore={score}
+onRewardWon={(reward) => {
+                        // Normalize
+                        const normalized = reward.isMultiplier
+                          ? { type: 'multiplier', value: 2, label: reward.label, points: 0, isMultiplier: true }
+                          : { type: 'points', value: reward.points, label: reward.label, points: reward.points, isMultiplier: false };
+
+                        const { finalPoints: fp } = applyBonus(basePoints, normalized);
+                        setBonusReward(normalized);
+                        setFinalPoints(fp);
+                        setShowWheel(false);
+
+                        // Save via BonusManager (store base/final points to get proper bonus delta)
+                        BonusManager.saveBonusToHistory(
+                          { label: normalized.label, points: normalized.points, isMultiplier: normalized.isMultiplier },
+                          basePoints,
+                          fp,
+                          totalQuestions
+                        );
+                        BonusManager.markWheelSpun(fp - basePoints);
+                    }}
+                    onClose={() => setShowWheel(false)}
+                />
+            )}
             {showAchievements && (
                 <AchievementNotification
                     badges={newBadges}
@@ -196,8 +236,8 @@ const QuizResults = ({
                     }}
                 />
             )}
-            <div className="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center p-2 sm:p-4 md:p-6">
-                <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8 max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg w-full text-center">
+<div className="min-h-screen theme-screen flex items-center justify-center p-2 sm:p-4 md:p-6">
+<div className="app-card rounded-xl sm:rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8 max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg w-full text-center">
                     {/* Emoji - Responsive sizing */}
                     <div className="text-4xl sm:text-6xl md:text-8xl mb-4 sm:mb-6 animate-bounce">{result.emoji}</div>
 
@@ -207,11 +247,13 @@ const QuizResults = ({
                     </h2>
 
                     <div className="bg-gray-50 rounded-lg sm:rounded-xl p-4 sm:p-6 mb-6 sm:mb-8">
-                        {/* Score Display - Responsive */}
+{/* Score Display - Responsive */}
                         <div className="text-3xl sm:text-4xl md:text-6xl font-bold text-gray-800 mb-2">
                             {score}/{totalQuestions}
                         </div>
-                        <div className="text-xl text-gray-600 mb-4">{percentage}% Correct</div>
+                        <div className="text-xl text-gray-600 mb-2">{percentage}% Correct</div>
+<div className="text-sm text-gray-600">Points: {finalPoints} {bonusReward ? `(base ${basePoints} + bonus)` : '(no bonus yet)'}
+                        </div>
 
                         <div className="relative w-32 h-32 mx-auto mb-4">
                             <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 120 120">
@@ -224,7 +266,7 @@ const QuizResults = ({
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4 mb-8">
+<div className="grid grid-cols-2 gap-4 mb-6">
                         <div className="bg-green-50 p-4 rounded-lg">
                             <div className="text-2xl font-bold text-green-600">{score}</div>
                             <div className="text-sm text-green-700">Correct</div>
