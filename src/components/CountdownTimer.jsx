@@ -1,4 +1,3 @@
-// CountdownTimer.jsx - Merged version with voice integration
 import { useState, useEffect, useRef } from "react";
 
 const CountdownTimer = ({
@@ -42,23 +41,31 @@ const CountdownTimer = ({
             setTimeRemaining((prev) => {
                 const next = Math.max(prev - 1, 0);
 
+                // onTimeUpdate callback, invoked in a microtask to avoid potential react state warnings
                 if (onTimeUpdate) {
-                    // invoke in microtask to avoid setState during render warnings
                     Promise.resolve().then(() => onTimeUpdate(next));
                 }
 
+                // Warning callback
                 if (next === showWarningAt && !hasWarningFired.current && onWarning) {
                     hasWarningFired.current = true;
                     onWarning();
                 }
 
+                // Time up logic
                 if (next === 0) {
                     if (!hasTimeUpFired.current) {
                         hasTimeUpFired.current = true;
+
+                        // Global handler for QuizQuestion, if it exists
                         if (typeof window !== "undefined" && window.quizQuestionHandleTimeOut) {
                             window.quizQuestionHandleTimeOut();
                         }
-                        onTimeUp && onTimeUp();
+                        
+                        // onTimeUp callback
+                        if (onTimeUp) {
+                            onTimeUp();
+                        }
                     }
                 }
 
@@ -74,7 +81,7 @@ const CountdownTimer = ({
         };
     }, [isActive, isPaused, timeRemaining, onTimeUp, onTimeUpdate, onWarning, showWarningAt]);
 
-const progressPercentage = Math.max(0, Math.min(100, (timeRemaining / duration) * 100));
+    const progressPercentage = Math.max(0, Math.min(100, (timeRemaining / duration) * 100));
 
     const getTimerColor = () => {
         const percentage = (timeRemaining / duration) * 100;
@@ -111,10 +118,14 @@ const progressPercentage = Math.max(0, Math.min(100, (timeRemaining / duration) 
     return (
         <div className={`w-full ${className}`}>
             <div className="flex items-center justify-center gap-3 mb-4">
-                <div className={`text-2xl transition-colors duration-300 ${getTimerColor()}`}>
+                <div
+                    className={`text-2xl transition-colors duration-300 ${getTimerColor()}`}
+                >
                     {isPaused ? "⏸️" : "⏱️"}
                 </div>
-                <span className={`text-xl font-bold transition-colors duration-300 ${getTimerColor()}`}>
+                <span
+                    className={`text-xl font-bold transition-colors duration-300 ${getTimerColor()}`}
+                >
                     {isPaused ? "Timer Paused: " : "Time Remaining: "}
                     {formatTime(timeRemaining)}
                 </span>
@@ -136,7 +147,9 @@ const progressPercentage = Math.max(0, Math.min(100, (timeRemaining / duration) 
                 </div>
 
                 {timeRemaining <= showWarningAt && !isPaused && (
-                    <div className={`absolute inset-0 rounded-full animate-pulse ${getProgressBarColor()} opacity-30`}></div>
+                    <div
+                        className={`absolute inset-0 rounded-full animate-pulse ${getProgressBarColor()} opacity-30`}
+                    ></div>
                 )}
 
                 {isPaused && (
