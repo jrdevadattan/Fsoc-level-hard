@@ -4,10 +4,14 @@ import QuizApp from "./components/QuizApp";
 import BookmarkedQuestions from "./components/BookmarkedQuestions";
 import BadgesPage from "./components/BadgesPage";
 import AuthPage from "./pages/AuthPage";
+import PrivacySettings from "./components/PrivacySettings";
+import CookiePolicy from "./components/CookiePolicy";
+import ConsentProvider from "./context/ConsentContext";
+import FooterPrivacy from "./components/FooterPrivacy";
 
 function ProtectedRoute({ children }) {
     const { isAuthenticated, isLoading } = useAuth();
-
+    
     if (isLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center">
@@ -15,40 +19,46 @@ function ProtectedRoute({ children }) {
             </div>
         );
     }
-
+    
     return isAuthenticated ? children : <Navigate to="/auth" replace />;
 }
 
 function App() {
     return (
         <Router>
-            <Routes>
-                <Route path="/auth" element={<AuthPage />} />
-                <Route
-                    path="/"
-                    element={
-                        <ProtectedRoute>
-                            <QuizApp />
-                        </ProtectedRoute>
-                    }
-                />
-                <Route
-                    path="/bookmarks"
-                    element={
-                        <ProtectedRoute>
-                            <BookmarkedQuestions />
-                        </ProtectedRoute>
-                    }
-                />
-                <Route
-                    path="/badges"
-                    element={
-                        <ProtectedRoute>
-                            <BadgesPage />
-                        </ProtectedRoute>
-                    }
-                />
-            </Routes>
+            <ConsentProvider>
+                <Routes>
+                    <Route path="/auth" element={<AuthPage />} />
+                    <Route path="/settings/privacy" element={<PrivacySettings />} />
+                    <Route path="/privacy/cookies" element={<CookiePolicy />} />
+                    
+                    <Route
+                        path="/"
+                        element={
+                            <ProtectedRoute>
+                                <QuizApp />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/bookmarks"
+                        element={
+                            <ProtectedRoute>
+                                <BookmarkedQuestions />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/badges"
+                        element={
+                            <ProtectedRoute>
+                                <BadgesPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                </Routes>
+                <FooterPrivacy />
+            </ConsentProvider>
         </Router>
     );
 }
