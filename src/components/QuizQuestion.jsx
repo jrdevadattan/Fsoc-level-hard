@@ -63,7 +63,12 @@ const QuizQuestion = ({
         setTranscript("");
         setHintsUsed(0);
         setEliminatedIndices(new Set());
-        setShuffledIndices([0, 1, 2, 3]);
+        // FIX: Initialize indices based on the actual number of answers
+        setShuffledIndices(
+            Array.from({ length: question.answers.length }, (_, i) => i).sort(
+                () => Math.random() - 0.5
+            )
+        );
         setIsShuffling(false);
         setLastShuffleTime(null);
         setShuffleCounter(0);
@@ -92,7 +97,8 @@ const QuizQuestion = ({
             !isTimedOut &&
             !isTimerPaused &&
             !isAnnouncingResult &&
-            timeRemaining > 0
+            timeRemaining > 0 &&
+            question.answers.length > 2 // Only shuffle multiple choice
         ) {
             setLastShuffleTime(timeRemaining);
             setShuffleCounter((prev) => prev + 1);
@@ -101,8 +107,10 @@ const QuizQuestion = ({
             if (shuffleCounter % 3 === 0) {
                 setIsShuffling(true);
 
-                // Create new shuffled order
-                const newIndices = [0, 1, 2, 3].sort(() => Math.random() - 0.5);
+                // FIX: Create new shuffled order based on actual answer count
+                const newIndices = Array.from({ length: question.answers.length }, (_, i) => i).sort(
+                    () => Math.random() - 0.5
+                );
 
                 setTimeout(() => {
                     setShuffledIndices(newIndices);
@@ -120,19 +128,18 @@ const QuizQuestion = ({
         isTimerEnabled,
         lastShuffleTime,
         shuffleCounter,
+        question.answers.length,
     ]);
 
     // Handle answer click
     const handleAnswerClick = (answer) => {
         if (selectedAnswer || isAnnouncingResult) return;
 
-        // Track answer timing for badges
         const answerTime = questionStartTime
             ? (Date.now() - questionStartTime) / 1000
             : 0;
         const isCorrect = answer === question.correct_answer;
 
-        // Check for speed and streak badges
         BadgeManager.onAnswerSubmitted(isCorrect, answerTime);
 
         setClickedAnswer(answer);
@@ -141,13 +148,13 @@ const QuizQuestion = ({
 
     // Hint system
     const handleHintRequest = () => {
-        // One hint per question for 50/50, and only before answering
         if (
             hintsUsed >= 1 ||
             hintsRemaining <= 0 ||
             selectedAnswer ||
             clickedAnswer ||
-            isTimedOut
+            isTimedOut ||
+            question.answers.length <= 2 // Can't use 50/50 on True/False
         ) {
             return;
         }
@@ -155,13 +162,11 @@ const QuizQuestion = ({
             setHintsUsed(1);
             setShowHint(true);
             eliminateTwoWrongAnswers();
-            // Track hint usage for badges
             BadgeManager.onHintUsed();
         }
     };
 
     const getHintText = () => {
-        // Show which options were eliminated (letters) if available
         if (hintsUsed === 1 && eliminatedIndices.size > 0) {
             const letters = Array.from(eliminatedIndices)
                 .sort((a, b) => a - b)
@@ -176,7 +181,6 @@ const QuizQuestion = ({
         const result = BookmarkManager.toggleBookmark(question);
         if (result.success) {
             setIsBookmarked(!isBookmarked);
-            // Track bookmark for badges
             if (result.action === "added") {
                 BadgeManager.onBookmarkAdded();
             }
@@ -214,6 +218,8 @@ const QuizQuestion = ({
         isTimedOut,
         question,
         hasResultBeenAnnounced,
+        speak,
+        onResultAnnounced
     ]);
 
     // Button classes
@@ -255,14 +261,13 @@ const QuizQuestion = ({
         const wrong = question.answers
             .map((ans, idx) => ({ ans, idx }))
             .filter((x) => x.ans !== question.correct_answer);
-        // Pick up to 2 random wrong answers
         const shuffled = [...wrong].sort(() => Math.random() - 0.5);
         const toRemove = shuffled
             .slice(0, Math.min(2, wrong.length))
             .map((x) => x.idx);
         setEliminatedIndices(new Set(toRemove));
     };
-
+    
     return (
         <>
             <div
@@ -324,15 +329,6 @@ const QuizQuestion = ({
                                     🔊 Announcing Result...
                                 </span>
                             )}
-                            {hintsRemaining > hintsUsed && (
-                                <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
-                                    💡 {hintsRemaining - hintsUsed} hint
-                                    {hintsRemaining - hintsUsed > 1
-                                        ? "s"
-                                        : ""}{" "}
-                                    remaining
-                                </span>
-                            )}
                         </div>
                     </div>
 
@@ -345,14 +341,16 @@ const QuizQuestion = ({
                                 hintsRemaining <= 0 ||
                                 selectedAnswer ||
                                 clickedAnswer ||
-                                isTimedOut
+                                isTimedOut ||
+                                question.answers.length <= 2
                             }
                             className={`p-2 rounded-lg transition-all duration-300 hover:scale-110 ${
                                 hintsUsed >= 1 ||
                                 hintsRemaining <= 0 ||
                                 selectedAnswer ||
                                 clickedAnswer ||
-                                isTimedOut
+                                isTimedOut ||
+                                question.answers.length <= 2
                                     ? "text-gray-300 cursor-not-allowed"
                                     : "text-yellow-500 hover:text-yellow-600"
                             }`}
@@ -444,8 +442,8 @@ const QuizQuestion = ({
                                     isEliminated
                                         ? "opacity-0 scale-95 pointer-events-none h-0 py-0 my-0 overflow-hidden transition-all duration-300"
                                         : isShuffling
-                                          ? "transition-all duration-200 transform scale-98 opacity-80"
-                                          : "transition-all duration-300 transform scale-100 opacity-100"
+                                        ? "transition-all duration-200 transform scale-98 opacity-80"
+                                        : "transition-all duration-300 transform scale-100 opacity-100"
                                 }`}
                                 data-quiz-answer="true"
                                 data-answer-index={originalIndex}
@@ -484,14 +482,7 @@ const QuizQuestion = ({
                                     <span className="text-2xl">⏱️</span>
                                     <span className="text-orange-600 font-semibold text-lg">
                                         Time's up! The correct answer was:{" "}
-                                        {question.correct_answer} (Option{" "}
-                                        {String.fromCharCode(
-                                            65 +
-                                                question.answers.indexOf(
-                                                    question.correct_answer,
-                                                ),
-                                        )}
-                                        )
+                                        {question.correct_answer}
                                     </span>
                                 </>
                             ) : (selectedAnswer || clickedAnswer) ===
@@ -507,14 +498,7 @@ const QuizQuestion = ({
                                     <span className="text-2xl">😔</span>
                                     <span className="text-red-600 font-semibold text-lg">
                                         Incorrect. The correct answer is:{" "}
-                                        {question.correct_answer} (Option{" "}
-                                        {String.fromCharCode(
-                                            65 +
-                                                question.answers.indexOf(
-                                                    question.correct_answer,
-                                                ),
-                                        )}
-                                        )
+                                        {question.correct_answer}
                                     </span>
                                 </>
                             )}
