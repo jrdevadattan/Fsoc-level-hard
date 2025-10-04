@@ -21,8 +21,8 @@ const ThemeToggle = ({ className = '' }) => {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`Theme: ${preference || 'system'}`}
-        className="flex items-center justify-center w-10 h-10 rounded-lg transition-colors duration-200"
-        style={{ color: 'var(--text)', background: 'transparent', border: '1px solid rgba(0,0,0,0.06)' }}
+className="flex items-center justify-center w-10 h-10 rounded-lg transition-colors duration-200"
+        style={{ color: 'var(--text)', background: 'transparent', border: '1px solid rgba(255,255,255,0.12)' }}
       >
         {theme === 'dark' ? (
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
