@@ -325,8 +325,7 @@ const QuizApp = () => {
       };
       setTimeout(moveToNext, 300);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isResultAnnouncementComplete, currentQuestionIndex, questions.length, selectedAnswers]);
+  }, [isResultAnnouncementComplete, currentQuestionIndex, questions.length, selectedAnswers, score, quizStartTimestamp, totalHintsUsed]);
 
   // ---------- Timer callbacks ----------
   const handleTimerExpired = () => handleAnswerSelect(null);
@@ -526,7 +525,10 @@ const QuizApp = () => {
           <QuizQuestion
             question={questions[currentQuestionIndex]}
             onAnswerSelect={handleAnswerSelect}
-            selectedAnswer={selectedAnswers[currentQuestionIndex]?.selectedAnswer}
+            selectedAnswer={
+              selectedAnswers[currentQuestionIndex]
+                ?.selectedAnswer
+            }
             isTimerEnabled={isTimerEnabled}
             onResultAnnounced={handleResultAnnounced}
             hintsRemaining={hintsRemaining}
