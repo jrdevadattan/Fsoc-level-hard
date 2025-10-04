@@ -288,7 +288,6 @@ const QuizQuestion = ({
                         setTranscript={setTranscript}
                         isTimedOut={isTimedOut}
                         showResult={showResult}
-                        isAnnouncingResult={isAnnouncingResult}
                     />
                 </div>
 
