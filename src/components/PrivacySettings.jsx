@@ -58,7 +58,7 @@ const PrivacySettings = () => {
   ]), [functional, analytics, marketing])
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 p-4">
+<div className="min-h-screen theme-screen p-4">
       <div className="max-w-4xl mx-auto bg-white/90 backdrop-blur rounded-2xl shadow-xl border border-white/20 p-6">
         <h1 className="text-3xl font-bold text-gray-800">Privacy Settings</h1>
         <p className="text-gray-600 mt-1">Manage your consent preferences and your data rights.</p>

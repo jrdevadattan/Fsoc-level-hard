@@ -48,7 +48,7 @@ const BadgesPage = () => {
   const categories = ['all', ...Object.keys(badges)];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600">
+<div className="min-h-screen theme-screen">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">

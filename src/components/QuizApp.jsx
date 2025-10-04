@@ -15,6 +15,7 @@ import QuizStateManager from "../utils/QuizStateManager";
 import BookmarkManager from "../utils/BookmarkManager";
 import BadgeManager from "../utils/BadgeManager";
 import ConsentManager from "../utils/ConsentManager";
+import BonusManager from "../utils/BonusManager";
 
 const QuizApp = () => {
     // ---------- Core Quiz State ----------
@@ -66,8 +67,7 @@ const QuizApp = () => {
 
     // ---------- Initialize Badge System ----------
     useEffect(() => {
-        BadgeManager.initializeBadgeSystem &&
-            BadgeManager.initializeBadgeSystem();
+        BadgeManager.initializeBadgeSystem && BadgeManager.initializeBadgeSystem();
     }, []);
 
     // ---------- Save / Load Quiz State ----------
@@ -156,42 +156,66 @@ const QuizApp = () => {
             setIsLoading(true);
             setError(null);
 
-            // Prefer ConsentManager for stored preferences when available
             const prefRaw =
-                (ConsentManager &&
-                    ConsentManager.getItem &&
-                    ConsentManager.getItem("quizPreferences")) ||
+                (ConsentManager && ConsentManager.getItem && ConsentManager.getItem("quizPreferences")) ||
                 localStorage.getItem("quizPreferences");
             let prefs = null;
             if (prefRaw) {
-                try {
-                    prefs = JSON.parse(prefRaw);
-                } catch {
-                    prefs = null;
-                }
+                try { prefs = JSON.parse(prefRaw); } catch { prefs = null; }
             }
 
             const amount = prefs?.numQuestions || 10;
             const categoryId = prefs?.category?.id || null;
-            const difficulty = prefs?.difficulty?.toLowerCase() || null;
+            const difficulty = prefs?.difficulty ? String(prefs.difficulty).toLowerCase() : null;
             const type = prefs?.questionType || null;
 
             if (prefs?.category?.name) setSelectedCategory(prefs.category.name);
 
-            const params = new URLSearchParams();
-            params.append("amount", amount);
-            if (categoryId) params.append("category", categoryId);
-            if (difficulty) params.append("difficulty", difficulty);
-            if (type) params.append("type", type);
+            const buildUrl = (p) => `https://opentdb.com/api.php?${p.toString()}`;
+            const makeParams = (opts) => {
+                const p = new URLSearchParams();
+                p.append("amount", String(opts.amount ?? amount ?? 10));
+                if (opts.categoryId) p.append("category", String(opts.categoryId));
+                if (opts.difficulty) p.append("difficulty", String(opts.difficulty));
+                if (opts.type) p.append("type", String(opts.type));
+                return p;
+            };
 
-            const url = `https://opentdb.com/api.php?${params.toString()}`;
-            const response = await fetch(url);
+            const attempts = [
+                makeParams({ amount, categoryId, difficulty, type }),
+                makeParams({ amount, categoryId, difficulty }), // drop type
+                makeParams({ amount, difficulty }), // drop category
+                makeParams({ amount }), // only amount
+            ];
 
-            if (!response.ok) throw new Error("Failed to fetch questions");
+            let data = null;
+            let lastErr = null;
 
-            const data = await response.json();
-            if (data.response_code !== 0)
-                throw new Error("No questions available for selected options.");
+            for (const params of attempts) {
+                const url = buildUrl(params);
+                try {
+                    const ctl = new AbortController();
+                    const to = setTimeout(() => ctl.abort(), 10000);
+                    const res = await fetch(url, { signal: ctl.signal, mode: 'cors' });
+                    clearTimeout(to);
+                    if (!res.ok) {
+                        lastErr = new Error(`API error ${res.status}`);
+                        continue;
+                    }
+                    const json = await res.json();
+                    if (json?.response_code === 0 && Array.isArray(json.results) && json.results.length > 0) {
+                        data = json;
+                        break;
+                    } else {
+                        lastErr = new Error("No questions for current filters");
+                    }
+                } catch (e) {
+                    lastErr = e;
+                    continue;
+                }
+            }
+
+            if (!data) throw lastErr || new Error("Failed to fetch questions");
 
             const processedQuestions = data.results.map((q) => {
                 const answers = [...q.incorrect_answers, q.correct_answer];
@@ -217,36 +241,23 @@ const QuizApp = () => {
             setQuizStartTime(Date.now());
             setQuizStartTimestamp(Date.now());
 
-            // Setup hints per quiz (default 3) and persist preference if missing
-            const limitFromPrefs =
-                typeof prefs?.hintsPerQuiz === "number"
-                    ? prefs.hintsPerQuiz
-                    : 3;
+            const limitFromPrefs = typeof prefs?.hintsPerQuiz === "number" ? prefs.hintsPerQuiz : 3;
             setHintsLimit(limitFromPrefs);
             setHintsRemaining(limitFromPrefs);
             setTotalHintsUsed(0);
             if (!prefs || typeof prefs.hintsPerQuiz !== "number") {
-                const nextPrefs = {
-                    ...(prefs || {}),
-                    hintsPerQuiz: limitFromPrefs,
-                };
-                try {
-                    localStorage.setItem(
-                        "quizPreferences",
-                        JSON.stringify(nextPrefs),
-                    );
-                } catch (error) {
-                    console.warn("Failed to save quiz preferences:", error);
-                }
+                const nextPrefs = { ...(prefs || {}), hintsPerQuiz: limitFromPrefs };
+                try { localStorage.setItem("quizPreferences", JSON.stringify(nextPrefs)); } catch {}
             }
 
             QuizStateManager.clearQuizState();
         } catch (err) {
-            setError(err.message || "Unknown error");
+            setError(`Failed to load questions: ${err?.message || 'Unknown error'}`);
         } finally {
             setIsLoading(false);
         }
     }, [timerDuration, isTimerEnabled]);
+
 
     // ---------- Auto-save every 5s ----------
     useEffect(() => {
@@ -383,6 +394,7 @@ const QuizApp = () => {
         timerDuration,
     ]);
 
+
     // ---------- Timer callbacks ----------
     const handleTimerExpired = () => handleAnswerSelect(null);
     const handleTimerWarning = () =>
@@ -409,6 +421,7 @@ const QuizApp = () => {
 
     // ---------- Restart Quiz ----------
     const restartQuiz = () => {
+        BonusManager.resetWheelState();
         setCurrentQuestionIndex(0);
         setSelectedAnswers([]);
         setQuizCompleted(false);
@@ -449,13 +462,13 @@ const QuizApp = () => {
 
     if (error) {
         return (
-            <div className="h-screen bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center p-4">
-                <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full text-center">
+            <div className="h-screen theme-screen flex items-center justify-center p-4">
+                <div className="app-card rounded-lg shadow-xl p-8 max-w-md w-full text-center">
                     <div className="text-red-500 text-6xl mb-4">⚠️</div>
-                    <h2 className="text-2xl font-bold text-gray-800 mb-4">
+                    <h2 className="text-2xl font-bold mb-4">
                         Oops! Something went wrong
                     </h2>
-                    <p className="text-gray-600 mb-6">{error}</p>
+                    <p className="text-gray-600 dark:text-gray-300 mb-6">{error}</p>
                     <div className="space-y-3">
                         <button
                             onClick={fetchQuestions}
@@ -511,11 +524,8 @@ const QuizApp = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 p-4">
-            <KeyboardShortcuts
-                onPauseToggle={handlePauseToggle}
-                isPaused={isQuizPaused}
-            />
+        <div className="min-h-screen theme-screen p-4">
+            <KeyboardShortcuts onPauseToggle={handlePauseToggle} isPaused={isQuizPaused} />
 
             <PauseOverlay
                 isVisible={isQuizPaused}
@@ -530,13 +540,8 @@ const QuizApp = () => {
             <div className="max-w-4xl mx-auto pt-4">
                 {/* Header */}
                 <div className="text-center mb-8 relative">
-                    <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">
-                        Quiz Challenge
-                    </h1>
-                    <p className="text-purple-200 text-lg">
-                        Test your knowledge with{" "}
-                        {selectedCategory || "this topic"} questions!
-                    </p>
+                    <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">Quiz Challenge</h1>
+                    <p className="text-purple-200 text-lg">Test your knowledge with {selectedCategory || "this topic"} questions!</p>
 
                     {/* Timer / Settings */}
                     <div className="absolute top-0 right-0 flex gap-2 items-center">
@@ -544,18 +549,10 @@ const QuizApp = () => {
                             onClick={handlePauseToggle}
                             disabled={quizCompleted}
                             className={`flex items-center justify-center w-10 h-10 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-all duration-200 backdrop-blur-sm border border-white/20 hover:border-white/40 ${quizCompleted ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
-                            aria-label={
-                                isQuizPaused ? "Resume quiz" : "Pause quiz"
-                            }
-                            title={
-                                isQuizPaused
-                                    ? "Resume quiz (Spacebar)"
-                                    : "Pause quiz (Spacebar)"
-                            }
+                            aria-label={isQuizPaused ? "Resume quiz" : "Pause quiz"}
+                            title={isQuizPaused ? "Resume quiz (Spacebar)" : "Pause quiz (Spacebar)"}
                         >
-                            <span className="text-lg">
-                                {isQuizPaused ? "▶️" : "⏸️"}
-                            </span>
+                            <span className="text-lg">{isQuizPaused ? "▶️" : "⏸️"}</span>
                         </button>
 
                         <ThemeToggle className="bg-white/20 text-white hover:bg-white/30" />
@@ -599,8 +596,7 @@ const QuizApp = () => {
                 {/* Question Counter */}
                 <div className="text-center mb-6">
                     <span className="bg-white/20 text-white px-4 py-2 rounded-full text-lg font-semibold">
-                        Question {currentQuestionIndex + 1} of{" "}
-                        {questions.length || 0}
+                        Question {currentQuestionIndex + 1} of {questions.length || 0}
                     </span>
                 </div>
 
