@@ -591,6 +591,8 @@ const QuizApp = () => {
                         onResultAnnounced={handleResultAnnounced}
                         hintsRemaining={hintsRemaining}
                         onRequestHint={requestHint}
+                        timeRemaining={timeRemaining}
+                        isTimerPaused={isTimerPaused || isQuizPaused}
                     />
                 )}
             </div>
