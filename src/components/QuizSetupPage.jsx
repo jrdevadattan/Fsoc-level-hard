@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTrophy } from "@fortawesome/free-solid-svg-icons";
 import BookmarkManager from "../utils/BookmarkManager";
+import ConsentManager from "../utils/ConsentManager";
 
 const QuizSetupPage = ({ onStart }) => {
     const [numQuestions, setNumQuestions] = useState(10);
@@ -59,7 +60,7 @@ const QuizSetupPage = ({ onStart }) => {
             difficulty,
             questionType,
         };
-        localStorage.setItem("quizPreferences", JSON.stringify(preferences));
+        ConsentManager.setItem("quizPreferences", JSON.stringify(preferences), ConsentManager.categories.functional);
         if (typeof onStart === "function") onStart();
         else navigate("/");
     };

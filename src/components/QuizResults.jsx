@@ -1,24 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import BadgeManager from "../utils/BadgeManager";
 import AchievementNotification from "./AchievementNotification";
 import QuizReview from "./QuizReview";
 import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
+import QRCode from "qrcode";
 
-const QuizResults = ({ 
-    score, 
-    totalQuestions, 
-    onRestart, 
-    onBackToSetup, 
+const QuizResults = ({
+    score,
+    totalQuestions,
+    onRestart,
+    onBackToSetup,
     quizData = {},
     questions = [],
-    userAnswers = []
+    userAnswers = [],
 }) => {
     const percentage = Math.round((score / totalQuestions) * 100);
     const [newBadges, setNewBadges] = useState([]);
     const [showAchievements, setShowAchievements] = useState(false);
     const [showReview, setShowReview] = useState(false);
+    const [linkCopied, setLinkCopied] = useState(false);
+    const [qrCodeUrl, setQrCodeUrl] = useState("");
 
     useEffect(() => {
         BadgeManager.initializeBadgeSystem();
@@ -36,22 +40,26 @@ const QuizResults = ({
         }
     }, [score, totalQuestions, quizData]);
 
-    const handleShareResult = () => {
-        const shareText = `I just scored ${score}/${totalQuestions} (${percentage}%) on this quiz! 🎯`;
-
-        if (navigator.share) {
-            navigator.share({
-                title: "Quiz Results",
-                text: shareText,
-                url: window.location.href,
+    const generateQRCode = useCallback(async () => {
+        try {
+            const shareUrl = `${window.location.origin}?score=${score}&total=${totalQuestions}&percent=${percentage}`;
+            const qrDataUrl = await QRCode.toDataURL(shareUrl, {
+                width: 150,
+                margin: 1,
+                color: {
+                    dark: "#8b5cf6",
+                    light: "#ffffff",
+                },
             });
-        } else {
-            navigator.clipboard.writeText(shareText);
-            alert("Results copied to clipboard!");
+            setQrCodeUrl(qrDataUrl);
+        } catch (error) {
+            console.error("Failed to generate QR code:", error);
         }
+    }, [score, totalQuestions, percentage]);
 
-        BadgeManager.onResultShared();
-    };
+    useEffect(() => {
+        generateQRCode();
+    }, [generateQRCode]);
 
     const getResultMessage = () => {
         if (percentage >= 90)
@@ -87,86 +95,168 @@ const QuizResults = ({
 
     const result = getResultMessage();
 
-    // PDF Export function
+    const getShareMessage = (platform) => {
+        const baseMessage = `I just scored ${score}/${totalQuestions} (${percentage}%)`;
+        const achievement = result.message.replace(/[^\w\s]/g, "");
 
-const handleDownloadPDF = () => {
-    try {
-        const doc = new jsPDF();
+        switch (platform) {
+            case "twitter":
+                return `${baseMessage} - ${achievement} on this amazing quiz! Challenge yourself: `;
+            case "facebook":
+                return `${baseMessage} on this quiz! ${achievement} Try it yourself and see how you do!`;
+            case "linkedin":
+                return `Achievement unlocked! ${baseMessage} on this knowledge quiz. ${achievement} #Learning #Quiz #Achievement`;
+            default:
+                return `${baseMessage} - ${achievement} in this quiz!`;
+        }
+    };
 
-        // Branding / Header
-        doc.setFillColor(139, 92, 246);  // Purple background
-        doc.rect(0, 0, 210, 30, 'F');   // Full width header rect
-        doc.setTextColor(255, 255, 255); // White text
-        doc.setFontSize(22);
-        doc.setFont('helvetica', 'bold');
-        doc.text("Quiz Results", 105, 20, { align: 'center' });
+    const handleDownloadPDF = () => {
+        try {
+            const doc = new jsPDF();
 
-        // Content style
-        doc.setTextColor(0);
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'normal');
+            doc.setFillColor(139, 92, 246);
+            doc.rect(0, 0, 210, 30, "F");
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(22);
+            doc.setFont("helvetica", "bold");
+            doc.text("Quiz Results Report", 105, 20, { align: "center" });
 
-        // Score summary box
-        doc.setFillColor(230, 230, 250); // light lavender bg
-        doc.roundedRect(15, 40, 180, 60, 5, 5, 'F'); // rounded rect
+            doc.setTextColor(0);
+            doc.setFontSize(14);
+            doc.setFont("helvetica", "normal");
 
-        doc.setTextColor(75, 0, 130); // dark purple text
-        doc.setFontSize(18);
-        doc.text(`Score: ${score} / ${totalQuestions}`, 25, 60);
-        doc.text(`Percentage: ${percentage}%`, 25, 75);
-        doc.text(`Result: ${result.message.replace(/[^\x00-\x7F]/g, "")}`, 25, 90); // emoji removed for font safety
+            doc.setFillColor(230, 230, 250);
+            doc.roundedRect(15, 40, 180, 80, 5, 5, "F");
 
-        // Date and Time
-        const now = new Date();
-        doc.setFontSize(12);
-        doc.setTextColor(50);
-        doc.text(`Date: ${now.toLocaleDateString()}`, 25, 110);
-        doc.text(`Time: ${now.toLocaleTimeString()}`, 110, 110);
+            doc.setTextColor(75, 0, 130);
+            doc.setFontSize(18);
+            doc.text(`Final Score: ${score} / ${totalQuestions}`, 25, 60);
+            doc.text(`Percentage: ${percentage}%`, 25, 75);
+            doc.text(
+                `Performance: ${result.message.replace(/[^\w\s]/g, "")}`,
+                25,
+                90,
+            );
 
-     
+            const now = new Date();
+            doc.setFontSize(12);
+            doc.setTextColor(50);
+            doc.text(`Quiz Date: ${now.toLocaleDateString()}`, 25, 110);
+            doc.text(`Completion Time: ${now.toLocaleTimeString()}`, 110, 110);
 
-        // Footer thank you note
-        doc.setFontSize(10);
-        doc.setTextColor(120);
-        doc.text("Thank you for participating!", 105, 280, { align: 'center' });
+            if (quizData.timeSpent) {
+                const minutes = Math.floor(quizData.timeSpent / 60);
+                const seconds = quizData.timeSpent % 60;
+                doc.text(`Total Time Spent: ${minutes}m ${seconds}s`, 25, 125);
+            }
 
-        // Save PDF
-        doc.save("quiz-results.pdf");
-    } catch (error) {
-        alert("Oops! Failed to generate PDF. Please try again.");
-    }
-};
+            doc.setFillColor(245, 245, 245);
+            doc.rect(15, 140, 180, 80, "F");
+            doc.setTextColor(100);
+            doc.setFontSize(14);
+            doc.text("Performance Breakdown:", 25, 155);
 
+            doc.setFontSize(12);
+            doc.text(`Correct Answers: ${score}`, 25, 170);
+            doc.text(`Incorrect Answers: ${totalQuestions - score}`, 25, 185);
+            doc.text(`Success Rate: ${percentage}%`, 25, 200);
 
-    // Twitter share
+            if (percentage >= 80) {
+                doc.text(
+                    "Excellent performance! Keep up the great work!",
+                    25,
+                    215,
+                );
+            } else if (percentage >= 60) {
+                doc.text("Good job! There's room for improvement.", 25, 215);
+            } else {
+                doc.text("Keep practicing to improve your score!", 25, 215);
+            }
+
+            doc.setFontSize(10);
+            doc.setTextColor(120);
+            doc.text("Generated by Quiz Challenge App", 105, 280, {
+                align: "center",
+            });
+            doc.text(
+                `Report generated on ${now.toLocaleDateString()} at ${now.toLocaleTimeString()}`,
+                105,
+                290,
+                { align: "center" },
+            );
+
+            doc.save(
+                `quiz-results-${percentage}%-${now.toISOString().split("T")[0]}.pdf`,
+            );
+        } catch {
+            alert("Failed to generate PDF. Please try again.");
+        }
+    };
+
     const handleShareTwitter = () => {
-        const text = encodeURIComponent(
-            `I scored ${score}/${totalQuestions} (${percentage}%) - ${result.message} in this quiz! If you want to try more quizzes , Try it yourself:`
-        );
-        const url = encodeURIComponent("https://opentdb.com/");
+        const text = encodeURIComponent(getShareMessage("twitter"));
+        const url = encodeURIComponent(window.location.origin);
         window.open(
             `https://twitter.com/intent/tweet?text=${text}&url=${url}`,
             "_blank",
-            "width=600,height=400"
+            "width=600,height=400",
         );
     };
 
-    // Facebook share
     const handleShareFacebook = () => {
-        const url = encodeURIComponent("https://opentdb.com/");
+        const url = encodeURIComponent(window.location.origin);
         window.open(
-            `https://www.facebook.com/sharer/sharer.php?u=${url}`,
+            `https://www.facebook.com/sharer/sharer.php?u=${url}&quote=${encodeURIComponent(getShareMessage("facebook"))}`,
             "_blank",
-            "width=600,height=400"
+            "width=600,height=400",
         );
     };
 
-    // Copy link with encoded results
-    const handleCopyLink = () => {
-        const shareUrl = `${window.location.href}?score=${score}&total=${totalQuestions}&percent=${percentage}`;
-        navigator.clipboard.writeText(shareUrl).then(() => {
-            alert("Shareable link copied to clipboard!");
-        });
+    const handleShareLinkedIn = () => {
+        const url = encodeURIComponent(window.location.origin);
+        const title = encodeURIComponent("Quiz Challenge Results");
+        const summary = encodeURIComponent(getShareMessage("linkedin"));
+        window.open(
+            `https://www.linkedin.com/sharing/share-offsite/?url=${url}&title=${title}&summary=${summary}`,
+            "_blank",
+            "width=600,height=400",
+        );
+    };
+
+    const handleCopyLink = async () => {
+        try {
+            const shareUrl = `${window.location.origin}?score=${score}&total=${totalQuestions}&percent=${percentage}&timestamp=${Date.now()}`;
+            await navigator.clipboard.writeText(shareUrl);
+            setLinkCopied(true);
+            setTimeout(() => setLinkCopied(false), 3000);
+        } catch {
+            alert("Failed to copy link. Please try again.");
+        }
+    };
+
+    const handleDownloadImage = async () => {
+        try {
+            const element = document.getElementById("quiz-results-card");
+            const canvas = await html2canvas(element, {
+                backgroundColor: "#8b5cf6",
+                scale: 2,
+                useCORS: true,
+                allowTaint: true,
+            });
+
+            const link = document.createElement("a");
+            link.download = `quiz-results-${percentage}%-${new Date().toISOString().split("T")[0]}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+        } catch (err) {
+            alert("Failed to generate image. Please try again.");
+            console.error("Image generation error:", err);
+        }
+    };
+
+    const handlePrint = () => {
+        window.print();
     };
 
     const handleReviewAnswers = () => {
@@ -189,103 +279,232 @@ const handleDownloadPDF = () => {
 
     return (
         <>
+            <style jsx>{`
+                @media print {
+                    body * {
+                        visibility: hidden;
+                    }
+                    .print-content,
+                    .print-content * {
+                        visibility: visible;
+                    }
+                    .print-content {
+                        position: absolute;
+                        left: 0;
+                        top: 0;
+                        width: 100%;
+                    }
+                    .no-print {
+                        display: none !important;
+                    }
+                    .print-only {
+                        display: block !important;
+                    }
+                }
+                .print-only {
+                    display: none;
+                }
+            `}</style>
+
             {showAchievements && (
                 <AchievementNotification
                     badges={newBadges}
                     onClose={() => setShowAchievements(false)}
                     onViewAll={() => {
                         setShowAchievements(false);
-                        // Navigate to badges page if needed
                     }}
                 />
             )}
+
             <div className="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center p-2 sm:p-4 md:p-6">
-                <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8 max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg w-full text-center">
+                <div
+                    id="quiz-results-card"
+                    className="print-content bg-white rounded-xl sm:rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8 max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg w-full text-center"
+                >
+                    <div className="text-4xl sm:text-6xl md:text-8xl mb-4 sm:mb-6 animate-bounce">
+                        {result.emoji}
+                    </div>
 
-                    {/* Emoji - Responsive sizing */}
-                    <div className="text-4xl sm:text-6xl md:text-8xl mb-4 sm:mb-6 animate-bounce">{result.emoji}</div>
-
-                    {/* Title */}
                     <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 mb-4 sm:mb-6">
                         Quiz Complete!
                     </h2>
 
                     <div className="bg-gray-50 rounded-lg sm:rounded-xl p-4 sm:p-6 mb-6 sm:mb-8">
-
-                        {/* Score Display */}
                         <div className="text-3xl sm:text-4xl md:text-6xl font-bold text-gray-800 mb-2">
                             {score}/{totalQuestions}
                         </div>
-                    </div>
-                </div>
+                        <div className="text-xl text-gray-600 mb-4">
+                            {percentage}% Correct
+                        </div>
+                        <div
+                            className={`text-lg font-semibold ${result.color} mb-4`}
+                        >
+                            {result.message}
+                        </div>
 
-                <div className="grid grid-cols-2 gap-4 mb-8">
-                    <div className="bg-green-50 p-4 rounded-lg">
-                        <div className="text-2xl font-bold text-green-600">{score}</div>
-                        <div className="text-sm text-green-700">Correct</div>
-                    </div>
-                    <div className="bg-red-50 p-4 rounded-lg">
-                        <div className="text-2xl font-bold text-red-600">
-                            {totalQuestions - score}
+                        <div className="relative w-32 h-32 mx-auto mb-4">
+                            <svg
+                                className="w-32 h-32 transform -rotate-90"
+                                viewBox="0 0 120 120"
+                            >
+                                <circle
+                                    cx="60"
+                                    cy="60"
+                                    r="50"
+                                    fill="none"
+                                    stroke="#e5e7eb"
+                                    strokeWidth="8"
+                                />
+                                <circle
+                                    cx="60"
+                                    cy="60"
+                                    r="50"
+                                    fill="none"
+                                    stroke="#8b5cf6"
+                                    strokeWidth="8"
+                                    strokeLinecap="round"
+                                    strokeDasharray={`${(percentage / 100) * 314} 314`}
+                                    className="transition-all duration-1000 ease-out"
+                                />
+                            </svg>
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="text-2xl font-bold text-purple-600">
+                                    {percentage}%
+                                </span>
+                            </div>
                         </div>
                     </div>
+
+                    <div className="grid grid-cols-2 gap-4 mb-8">
+                        <div className="bg-green-50 p-4 rounded-lg">
+                            <div className="text-2xl font-bold text-green-600">
+                                {score}
+                            </div>
+                            <div className="text-sm text-green-700">
+                                Correct
+                            </div>
+                        </div>
+                        <div className="bg-red-50 p-4 rounded-lg">
+                            <div className="text-2xl font-bold text-red-600">
+                                {totalQuestions - score}
+                            </div>
+                            <div className="text-sm text-red-700">
+                                Incorrect
+                            </div>
+                        </div>
+                    </div>
+
+                    {qrCodeUrl && (
+                        <div className="mb-6 no-print">
+                            <p className="text-sm text-gray-500 mb-2">
+                                Scan to share:
+                            </p>
+                            <div className="flex justify-center">
+                                <img
+                                    src={qrCodeUrl}
+                                    alt="QR Code for sharing results"
+                                    className="border border-gray-200 rounded-lg"
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="print-only mb-6">
+                        <p className="text-sm text-gray-600">
+                            Quiz completed on {new Date().toLocaleDateString()}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                            Generated by Quiz Challenge App
+                        </p>
+                    </div>
                 </div>
 
-                <div className="space-y-3 mb-8">
-                    <button
-                        onClick={onRestart}
-                        className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold py-4 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg"
-                        data-quiz-restart="true"
-                    >
-                        🔄 Try Again
-                    </button>
+                    <div className="space-y-3 mb-8 no-print">
+                        <button
+                            onClick={onRestart}
+                            className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold py-4 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg"
+                        >
+                            🔄 Try Again
+                        </button>
 
-                    <button
-                        onClick={onBackToSetup}
-                        className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-black font-bold py-4 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg"
-                    >
-                        ⚙️ Back to Setup
-                    </button>
+                        <button
+                            onClick={onBackToSetup}
+                            className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-black font-bold py-4 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg"
+                        >
+                            ⚙️ Back to Setup
+                        </button>
 
-                    <button
-                        onClick={() => window.open("https://opentdb.com/", "_blank")}
-                        className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-3 px-6 rounded-lg transition-colors duration-200"
-                    >
-                        🌐 More Quizzes
-                    </button>
-                </div>
+                        <button
+                            onClick={handleReviewAnswers}
+                            className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold py-4 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg"
+                        >
+                            📝 Review Answers
+                        </button>
+                    </div>
 
-                <div className="mt-6">
-                    <p className="text-sm text-gray-500 mb-3">Share your results:</p>
-                </div>
-                <div className="space-y-3">
-                    <button
-                        onClick={handleDownloadPDF}
-                        className="w-full bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white font-bold py-4 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg"
-                    >
-                        📄 Download PDF
-                    </button>
+                    <div className="space-y-3 no-print">
+                        <p className="text-sm text-gray-500 mb-3">
+                            Export & Share:
+                        </p>
 
-                    <button
-                        onClick={handleShareTwitter}
-                        className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg"
-                    >
-                        🐦 Share on Twitter
-                    </button>
+                        <div className="grid grid-cols-2 gap-3">
+                            <button
+                                onClick={handleDownloadPDF}
+                                className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg text-sm"
+                            >
+                                📄 PDF
+                            </button>
 
-                    <button
-                        onClick={handleShareFacebook}
-                        className="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-4 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg"
-                    >
-                        📘 Share on Facebook
-                    </button>
+                            <button
+                                onClick={handleDownloadImage}
+                                className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg text-sm"
+                            >
+                                🖼️ Image
+                            </button>
 
-                    <button
-                        onClick={handleCopyLink}
-                        className="w-full bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-4 px-6 rounded-lg transition-colors duration-200"
-                    >
-                        🔗 Copy Shareable Link
-                    </button>
+                            <button
+                                onClick={handlePrint}
+                                className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg text-sm"
+                            >
+                                🖨️ Print
+                            </button>
+
+                            <button
+                                onClick={handleCopyLink}
+                                className={`${linkCopied ? "bg-green-600" : "bg-purple-600 hover:bg-purple-700"} text-white font-bold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg text-sm`}
+                            >
+                                {linkCopied ? "✅ Copied!" : "🔗 Link"}
+                            </button>
+                        </div>
+
+                        <div className="mt-4">
+                            <p className="text-sm text-gray-500 mb-3">
+                                Share on social media:
+                            </p>
+                            <div className="grid grid-cols-3 gap-3">
+                                <button
+                                    onClick={handleShareTwitter}
+                                    className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg text-sm"
+                                >
+                                    🐦 Twitter
+                                </button>
+
+                                <button
+                                    onClick={handleShareFacebook}
+                                    className="bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg text-sm"
+                                >
+                                    📘 Facebook
+                                </button>
+
+                                <button
+                                    onClick={handleShareLinkedIn}
+                                    className="bg-blue-800 hover:bg-blue-900 text-white font-bold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg text-sm"
+                                >
+                                    💼 LinkedIn
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </>

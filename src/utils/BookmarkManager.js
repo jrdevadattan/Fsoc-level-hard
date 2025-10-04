@@ -1,10 +1,12 @@
+import ConsentManager from './ConsentManager';
+
 class BookmarkManager {
   static STORAGE_KEY = 'quiz_bookmarks';
   static MAX_BOOKMARKS = 50;
 
   static getBookmarks() {
     try {
-      const bookmarks = localStorage.getItem(this.STORAGE_KEY);
+      const bookmarks = ConsentManager.getItem(this.STORAGE_KEY);
       return bookmarks ? JSON.parse(bookmarks) : [];
     } catch (error) {
       console.error('Error loading bookmarks:', error);
@@ -14,8 +16,8 @@ class BookmarkManager {
 
   static saveBookmarks(bookmarks) {
     try {
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(bookmarks));
-      return true;
+      const ok = ConsentManager.setItem(this.STORAGE_KEY, JSON.stringify(bookmarks), ConsentManager.categories.functional);
+      return !!ok;
     } catch (error) {
       console.error('Error saving bookmarks:', error);
       return false;
@@ -84,7 +86,7 @@ class BookmarkManager {
 
   static clearAllBookmarks() {
     try {
-      localStorage.removeItem(this.STORAGE_KEY);
+      ConsentManager.removeItem(this.STORAGE_KEY);
       return { success: true, message: 'All bookmarks cleared' };
     } catch (error) {
       console.error('Error clearing bookmarks:', error);
