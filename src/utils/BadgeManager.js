@@ -1,3 +1,5 @@
+import ConsentManager from './ConsentManager';
+
 const BADGE_STORAGE_KEY = 'userBadges';
 const BADGE_STATS_KEY = 'badgeStats';
 
@@ -169,11 +171,14 @@ class BadgeManager {
   };
 
   static initializeBadgeSystem() {
+    if (!ConsentManager.hasConsent(ConsentManager.categories.functional)) {
+      return;
+    }
     const existingBadges = this.getUserBadges();
     const existingStats = this.getBadgeStats();
 
     if (!existingBadges) {
-      localStorage.setItem(BADGE_STORAGE_KEY, JSON.stringify({}));
+      ConsentManager.setItem(BADGE_STORAGE_KEY, JSON.stringify({}), ConsentManager.categories.functional);
     }
 
     if (!existingStats) {
@@ -191,13 +196,13 @@ class BadgeManager {
         quizzes_completed: [],
         created_at: Date.now()
       };
-      localStorage.setItem(BADGE_STATS_KEY, JSON.stringify(initialStats));
+      ConsentManager.setItem(BADGE_STATS_KEY, JSON.stringify(initialStats), ConsentManager.categories.functional);
     }
   }
 
   static getUserBadges() {
     try {
-      const badges = localStorage.getItem(BADGE_STORAGE_KEY);
+      const badges = ConsentManager.getItem(BADGE_STORAGE_KEY);
       return badges ? JSON.parse(badges) : {};
     } catch (error) {
       console.error('Error loading user badges:', error);
@@ -207,7 +212,7 @@ class BadgeManager {
 
   static getBadgeStats() {
     try {
-      const stats = localStorage.getItem(BADGE_STATS_KEY);
+      const stats = ConsentManager.getItem(BADGE_STATS_KEY);
       return stats ? JSON.parse(stats) : null;
     } catch (error) {
       console.error('Error loading badge stats:', error);
@@ -217,10 +222,11 @@ class BadgeManager {
 
   static updateBadgeStats(updates) {
     try {
+      if (!ConsentManager.hasConsent(ConsentManager.categories.functional)) return null;
       const currentStats = this.getBadgeStats() || {};
-      const newStats = { ...currentStats, ...updates };
-      localStorage.setItem(BADGE_STATS_KEY, JSON.stringify(newStats));
-      return newStats;
+      const updatedStats = { ...currentStats, ...updates };
+      ConsentManager.setItem(BADGE_STATS_KEY, JSON.stringify(updatedStats), ConsentManager.categories.functional);
+      return updatedStats;
     } catch (error) {
       console.error('Error updating badge stats:', error);
       return null;
@@ -229,6 +235,7 @@ class BadgeManager {
 
   static awardBadge(badgeId) {
     try {
+      if (!ConsentManager.hasConsent(ConsentManager.categories.functional)) return false;
       const userBadges = this.getUserBadges();
       if (!userBadges[badgeId]) {
         userBadges[badgeId] = {
@@ -236,7 +243,7 @@ class BadgeManager {
           earnedAt: Date.now(),
           isNew: true
         };
-        localStorage.setItem(BADGE_STORAGE_KEY, JSON.stringify(userBadges));
+        ConsentManager.setItem(BADGE_STORAGE_KEY, JSON.stringify(userBadges), ConsentManager.categories.functional);
         return true;
       }
       return false;
@@ -248,10 +255,11 @@ class BadgeManager {
 
   static markBadgeAsViewed(badgeId) {
     try {
+      if (!ConsentManager.hasConsent(ConsentManager.categories.functional)) return;
       const userBadges = this.getUserBadges();
       if (userBadges[badgeId]) {
         userBadges[badgeId].isNew = false;
-        localStorage.setItem(BADGE_STORAGE_KEY, JSON.stringify(userBadges));
+        ConsentManager.setItem(BADGE_STORAGE_KEY, JSON.stringify(userBadges), ConsentManager.categories.functional);
       }
     } catch (error) {
       console.error('Error marking badge as viewed:', error);

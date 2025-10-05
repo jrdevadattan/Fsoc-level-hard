@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTrophy } from "@fortawesome/free-solid-svg-icons";
 import BookmarkManager from "../utils/BookmarkManager";
+import ConsentManager from "../utils/ConsentManager";
 
 const QuizSetupPage = ({ onStart }) => {
     const [numQuestions, setNumQuestions] = useState(10);
@@ -59,7 +60,7 @@ const QuizSetupPage = ({ onStart }) => {
             difficulty,
             questionType,
         };
-        localStorage.setItem("quizPreferences", JSON.stringify(preferences));
+        ConsentManager.setItem("quizPreferences", JSON.stringify(preferences), ConsentManager.categories.functional);
         if (typeof onStart === "function") onStart();
         else navigate("/");
     };
@@ -301,9 +302,10 @@ const Dropdown = ({
     const isOpen = openDropdown === id;
     return (
         <div className="relative">
-            <button
+<button
                 onClick={() => setOpenDropdown(isOpen ? null : id)}
-                className="w-full bg-white/20 px-4 py-3 rounded-xl text-left flex items-center justify-between text-white hover:bg-white/30 transition"
+                className="w-full px-4 py-3 rounded-xl text-left flex items-center justify-between transition"
+                style={{ background: '#ffffff', color: '#000000' }}
             >
                 <span>{value || "Select..."}</span>
                 <svg
@@ -318,7 +320,7 @@ const Dropdown = ({
             </button>
 
             {isOpen && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white text-black rounded-xl shadow-xl z-10 max-h-64 overflow-y-auto">
+<div className="absolute top-full left-0 right-0 mt-2 rounded-xl shadow-xl z-10 max-h-64 overflow-y-auto" style={{ background: '#ffffff', color: '#000000' }}>
                     {options.map((option, index) => {
                         const label = renderLabel
                             ? renderLabel(option)
@@ -334,7 +336,7 @@ const Dropdown = ({
                                     onChange(option);
                                     setOpenDropdown(null);
                                 }}
-                                className="w-full text-left px-4 py-3 hover:bg-purple-100 transition"
+className="w-full text-left px-4 py-3 transition" style={{ background: 'transparent' }}
                             >
                                 {label}
                             </button>

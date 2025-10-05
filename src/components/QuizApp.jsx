@@ -14,6 +14,8 @@ import ThemeToggle from "./ThemeToggle";
 import QuizStateManager from "../utils/QuizStateManager";
 import BookmarkManager from "../utils/BookmarkManager";
 import BadgeManager from "../utils/BadgeManager";
+import ConsentManager from "../utils/ConsentManager";
+import BonusManager from "../utils/BonusManager";
 
 const QuizApp = () => {
   // ---------- Core Quiz State ----------
@@ -22,6 +24,11 @@ const QuizApp = () => {
   const [selectedAnswers, setSelectedAnswers] = useState([]);
   const [quizCompleted, setQuizCompleted] = useState(false);
   const [score, setScore] = useState(0);
+
+  // ---------- Review Mode ----------
+  const [reviewMode, setReviewMode] = useState(false);
+
+  // ---------- Loading / Error ----------
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -79,7 +86,7 @@ const QuizApp = () => {
 
   // ---------- Initialize Badge System ----------
   useEffect(() => {
-    BadgeManager.initializeBadgeSystem();
+    BadgeManager.initializeBadgeSystem && BadgeManager.initializeBadgeSystem();
   }, []);
 
   // ---------- Save / Load Quiz State ----------
@@ -119,21 +126,33 @@ const QuizApp = () => {
     const savedState = QuizStateManager.loadQuizState();
     if (!savedState) return false;
 
-    setQuestions(savedState.questions);
-    setCurrentQuestionIndex(savedState.currentQuestionIndex);
-    setSelectedAnswers(savedState.selectedAnswers);
-    setScore(savedState.score);
-    setTimeRemaining(savedState.timeRemaining);
-    setTimerDuration(savedState.timerDuration);
-    setIsTimerEnabled(savedState.isTimerEnabled);
-    setSelectedCategory(savedState.selectedCategory);
-    setQuizStartTime(savedState.quizStartTime);
-    setHintsRemaining(savedState.hintsRemaining);
-    setTotalHintsUsed(savedState.totalHintsUsed);
+    setQuestions(savedState.questions || []);
+    setCurrentQuestionIndex(savedState.currentQuestionIndex || 0);
+    setSelectedAnswers(savedState.selectedAnswers || []);
+    setScore(savedState.score || 0);
+    setTimeRemaining(
+      typeof savedState.timeRemaining !== "undefined"
+        ? savedState.timeRemaining
+        : null,
+    );
+    setTimerDuration(savedState.timerDuration || timerDuration);
+    setIsTimerEnabled(
+      typeof savedState.isTimerEnabled !== "undefined"
+        ? savedState.isTimerEnabled
+        : isTimerEnabled,
+    );
+    setSelectedCategory(savedState.selectedCategory || "");
+    setQuizStartTime(savedState.quizStartTime || null);
+    setHintsRemaining(
+      typeof savedState.hintsRemaining === "number"
+        ? savedState.hintsRemaining
+        : hintsLimit,
+    );
+    setTotalHintsUsed(savedState.totalHintsUsed || 0);
     setIsQuizPaused(true);
 
     return true;
-  }, []);
+  }, [timerDuration, isTimerEnabled, hintsLimit]);
 
   // ---------- Handle Pause / Resume ----------
   const handlePauseToggle = useCallback(() => {
@@ -156,37 +175,66 @@ const QuizApp = () => {
       setIsLoading(true);
       setError(null);
 
-      const prefRaw = localStorage.getItem("quizPreferences");
+      const prefRaw =
+        (ConsentManager && ConsentManager.getItem && ConsentManager.getItem("quizPreferences")) ||
+        localStorage.getItem("quizPreferences");
       let prefs = null;
       if (prefRaw) {
-        try {
-          prefs = JSON.parse(prefRaw);
-        } catch (err) {
-          console.error('Error parsing preferences:', err);
-          prefs = null;
-        }
+        try { prefs = JSON.parse(prefRaw); } catch { prefs = null; }
       }
 
       const amount = prefs?.numQuestions || 10;
       const categoryId = prefs?.category?.id || null;
-      const difficulty = prefs?.difficulty?.toLowerCase() || null;
+      const difficulty = prefs?.difficulty ? String(prefs.difficulty).toLowerCase() : null;
       const type = prefs?.questionType || null;
 
       if (prefs?.category?.name) setSelectedCategory(prefs.category.name);
 
-      const params = new URLSearchParams();
-      params.append("amount", amount);
-      if (categoryId) params.append("category", categoryId);
-      if (difficulty) params.append("difficulty", difficulty);
-      if (type) params.append("type", type);
+      const buildUrl = (p) => `https://opentdb.com/api.php?${p.toString()}`;
+      const makeParams = (opts) => {
+        const p = new URLSearchParams();
+        p.append("amount", String(opts.amount ?? amount ?? 10));
+        if (opts.categoryId) p.append("category", String(opts.categoryId));
+        if (opts.difficulty) p.append("difficulty", String(opts.difficulty));
+        if (opts.type) p.append("type", String(opts.type));
+        return p;
+      };
 
-      const url = `https://opentdb.com/api.php?${params.toString()}`;
-      const response = await fetch(url);
+      const attempts = [
+        makeParams({ amount, categoryId, difficulty, type }),
+        makeParams({ amount, categoryId, difficulty }),
+        makeParams({ amount, difficulty }),
+        makeParams({ amount }),
+      ];
 
-      if (!response.ok) throw new Error("Failed to fetch questions");
+      let data = null;
+      let lastErr = null;
 
-      const data = await response.json();
-      if (data.response_code !== 0) throw new Error("No questions available for selected options.");
+      for (const params of attempts) {
+        const url = buildUrl(params);
+        try {
+          const ctl = new AbortController();
+          const to = setTimeout(() => ctl.abort(), 10000);
+          const res = await fetch(url, { signal: ctl.signal, mode: 'cors' });
+          clearTimeout(to);
+          if (!res.ok) {
+            lastErr = new Error(`API error ${res.status}`);
+            continue;
+          }
+          const json = await res.json();
+          if (json?.response_code === 0 && Array.isArray(json.results) && json.results.length > 0) {
+            data = json;
+            break;
+          } else {
+            lastErr = new Error("No questions for current filters");
+          }
+        } catch (e) {
+          lastErr = e;
+          continue;
+        }
+      }
+
+      if (!data) throw lastErr || new Error("Failed to fetch questions");
 
       const processedQuestions = data.results.map((q) => {
         const answers = [...q.incorrect_answers, q.correct_answer];
@@ -219,16 +267,12 @@ const QuizApp = () => {
       setTotalHintsUsed(0);
       if (!prefs || typeof prefs.hintsPerQuiz !== "number") {
         const nextPrefs = { ...(prefs || {}), hintsPerQuiz: limitFromPrefs };
-        try {
-          localStorage.setItem("quizPreferences", JSON.stringify(nextPrefs));
-        } catch (err) {
-          console.error('Error saving preferences:', err);
-        }
+        try { localStorage.setItem("quizPreferences", JSON.stringify(nextPrefs)); } catch {}
       }
 
       QuizStateManager.clearQuizState();
     } catch (err) {
-      setError(err.message || "Unknown error");
+      setError(`Failed to load questions: ${err?.message || 'Unknown error'}`);
     } finally {
       setIsLoading(false);
     }
@@ -286,6 +330,7 @@ const QuizApp = () => {
       const moveToNext = () => {
         if (currentQuestionIndex < questions.length - 1) {
           setCurrentQuestionIndex((prev) => prev + 1);
+          setTimeRemaining(isTimerEnabled ? timerDuration : null);
           setIsTimerPaused(false);
           setIsResultAnnouncementComplete(false);
         } else {
@@ -293,9 +338,9 @@ const QuizApp = () => {
 
           const quizEndTime = Date.now();
           const totalTimeSpent = quizStartTimestamp ? (quizEndTime - quizStartTimestamp) / 1000 : 0;
-          const averageTimePerQuestion = totalTimeSpent / questions.length;
+          const averageTimePerQuestion = questions.length ? totalTimeSpent / questions.length : 0;
 
-          BadgeManager.onQuizCompleted({
+          BadgeManager.onQuizCompleted && BadgeManager.onQuizCompleted({
             score,
             totalQuestions: questions.length,
             timeSpent: totalTimeSpent,
@@ -316,19 +361,28 @@ const QuizApp = () => {
                 },
               })
             );
-          } catch (err) {
-            console.error('Error saving quiz stats:', err);
+          } catch (error) {
+            console.warn("Failed to save quiz stats:", error);
           }
         }
       };
       setTimeout(moveToNext, 300);
     }
-  }, [isResultAnnouncementComplete, currentQuestionIndex, questions.length, selectedAnswers, score, totalHintsUsed, quizStartTimestamp]);
+  }, [
+    isResultAnnouncementComplete,
+    currentQuestionIndex,
+    questions.length,
+    selectedAnswers,
+    score,
+    quizStartTimestamp,
+    totalHintsUsed,
+    isTimerEnabled,
+    timerDuration,
+  ]);
 
   // ---------- Timer callbacks ----------
   const handleTimerExpired = () => handleAnswerSelect(null);
   const handleTimerWarning = () => console.log("Timer warning: 10 seconds remaining");
-
   const handleResultAnnounced = () => setIsResultAnnouncementComplete(true);
 
   // ---------- Back to Setup ----------
@@ -352,6 +406,7 @@ const QuizApp = () => {
 
   // ---------- Restart Quiz ----------
   const restartQuiz = () => {
+    BonusManager.resetWheelState();
     setCurrentQuestionIndex(0);
     setSelectedAnswers([]);
     setQuizCompleted(false);
@@ -378,17 +433,28 @@ const QuizApp = () => {
     setQuestionRatings((prev) => [...prev, rating]);
   }, []);
 
+  // ---------- Analytics (simulated) ----------
+  useEffect(() => {
+    if (
+      ConsentManager &&
+      ConsentManager.hasConsent &&
+      ConsentManager.hasConsent(ConsentManager.categories?.analytics)
+    ) {
+      console.debug("[analytics] pageview", { path: window.location.pathname });
+    }
+  }, []);
+
   // ---------- Render ----------
   if (showSetup) return <QuizSetupPage onStart={() => setShowSetup(false)} />;
   if (isLoading) return <LoadingSpinner />;
 
   if (error) {
     return (
-      <div className="h-screen bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full text-center">
+      <div className="h-screen theme-screen flex items-center justify-center p-4">
+        <div className="app-card rounded-lg shadow-xl p-8 max-w-md w-full text-center">
           <div className="text-red-500 text-6xl mb-4">⚠️</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Oops! Something went wrong</h2>
-          <p className="text-gray-600 mb-6">{error}</p>
+          <h2 className="text-2xl font-bold mb-4">Oops! Something went wrong</h2>
+          <p className="text-gray-600 dark:text-gray-300 mb-6">{error}</p>
           <div className="space-y-3">
             <button
               onClick={fetchQuestions}
@@ -408,7 +474,19 @@ const QuizApp = () => {
     );
   }
 
+  if (quizCompleted && reviewMode) {
+    return (
+      <QuizReviewWrapper
+        questions={questions}
+        userAnswers={selectedAnswers.map((a) => a.selectedAnswer)}
+        onBack={() => setReviewMode(false)}
+      />
+    );
+  }
+
   if (quizCompleted) {
+    const timeSpent = quizStartTimestamp ? (Date.now() - quizStartTimestamp) / 1000 : 0;
+    const avgTime = questions.length ? timeSpent / questions.length : 0;
     return (
       <>
         <KeyboardShortcuts />
@@ -420,13 +498,18 @@ const QuizApp = () => {
           questions={questions}
           userAnswers={selectedAnswers}
           questionRatings={questionRatings}
+          quizData={{
+            timeSpent,
+            averageTimePerQuestion: avgTime,
+            hintsUsed: totalHintsUsed,
+          }}
         />
       </>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 p-4">
+    <div className="min-h-screen theme-screen p-4">
       <KeyboardShortcuts onPauseToggle={handlePauseToggle} isPaused={isQuizPaused} />
 
       <PauseOverlay
@@ -458,7 +541,9 @@ const QuizApp = () => {
             >
               <span className="text-lg">{isQuizPaused ? "▶️" : "⏸️"}</span>
             </button>
+
             <ThemeToggle className="bg-white/20 text-white hover:bg-white/30" />
+
             <TimerSettings
               currentDuration={timerDuration}
               onDurationChange={setTimerDuration}
@@ -511,6 +596,8 @@ const QuizApp = () => {
             userId={userId}
             username={username}
             onRatingSubmit={handleQuestionRating}
+            timeRemaining={timeRemaining}
+            isTimerPaused={isTimerPaused || isQuizPaused}
           />
         )}
       </div>
