@@ -11,6 +11,7 @@ import ReportModal from "./ReportModal";
 import CommentSection from "./CommentSection";
 import ThankYouModal from "./ThankYouModal";
 import { useVoice } from "../hooks/useVoice";
+import CelebrationManager from "../utils/CelebrationManager";
 
 const QuizQuestion = ({
   question,
@@ -167,12 +168,31 @@ const QuizQuestion = ({
     question.answers.length,
   ]);
 
-  // Handle answer click
-  const handleAnswerClick = (answer) => {
+  // Handle answer click with celebration effects
+  const handleAnswerClick = (answer, event) => {
     if (selectedAnswer || isAnnouncingResult) return;
 
     const answerTime = questionStartTime ? (Date.now() - questionStartTime) / 1000 : 0;
     const isCorrect = answer === question.correct_answer;
+
+    const answerElement = event.currentTarget;
+
+    // Celebration effects
+    CelebrationManager.createRippleEffect(answerElement, "rgba(139, 92, 246, 0.3)", event);
+    CelebrationManager.bounceElement(answerElement, "light");
+
+    if (isCorrect) {
+      setTimeout(() => {
+        CelebrationManager.animateCorrectAnswer(answerElement);
+        CelebrationManager.triggerHapticFeedback("success");
+        CelebrationManager.createSparkles(answerElement, 3);
+      }, 200);
+    } else {
+      setTimeout(() => {
+        CelebrationManager.animateIncorrectAnswer(answerElement);
+        CelebrationManager.triggerHapticFeedback("error");
+      }, 200);
+    }
 
     BadgeManager.onAnswerSubmitted(isCorrect, answerTime);
 
@@ -198,6 +218,13 @@ const QuizQuestion = ({
       eliminateTwoWrongAnswers();
       BadgeManager.onHintUsed();
     }
+  };
+
+  const eliminateTwoWrongAnswers = () => {
+    const wrong = question.answers.map((ans, idx) => ({ ans, idx })).filter((x) => x.ans !== question.correct_answer);
+    const shuffled = [...wrong].sort(() => Math.random() - 0.5);
+    const toRemove = shuffled.slice(0, Math.min(2, wrong.length)).map((x) => x.idx);
+    setEliminatedIndices(new Set(toRemove));
   };
 
   const getHintText = () => {
@@ -250,14 +277,14 @@ const QuizQuestion = ({
   const getButtonClass = (answer) => {
     const base = "w-full p-4 text-left rounded-lg font-medium transition-all duration-300 transform ";
     if (!selectedAnswer && !clickedAnswer && !isTimedOut) {
-      return base + "bg-white dark:bg-gray-700 hover:bg-purple-50 dark:hover:bg-gray-600 hover:scale-105 hover:shadow-lg text-gray-800 dark:text-gray-200 border-2 border-transparent hover:border-purple-300";
+      return base + "bg-white dark:bg-gray-700 hover:bg-purple-50 dark:hover:bg-gray-600 hover:scale-105 hover:shadow-lg text-gray-800 dark:text-gray-200 border-2 border-transparent hover:border-purple-300 ripple-container";
     }
     if (selectedAnswer || clickedAnswer || isTimedOut) {
       if (answer === question.correct_answer)
-        return base + "bg-green-500 text-white border-2 border-green-600 scale-105 shadow-lg";
+        return base + "bg-green-500 text-white border-2 border-green-600 scale-105 shadow-lg animate-pulse";
       if (answer === (selectedAnswer || clickedAnswer))
         return base + "bg-red-500 text-white border-2 border-red-600 scale-105 shadow-lg";
-      return base + "bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400 border-2 border-gray-400";
+      return base + "bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400 border-2 border-gray-400 opacity-60";
     }
     return base;
   };
@@ -267,13 +294,6 @@ const QuizQuestion = ({
     if (answer === question.correct_answer) return <span className="text-2xl">✓</span>;
     if (answer === (selectedAnswer || clickedAnswer)) return <span className="text-2xl">✗</span>;
     return null;
-  };
-
-  const eliminateTwoWrongAnswers = () => {
-    const wrong = question.answers.map((ans, idx) => ({ ans, idx })).filter((x) => x.ans !== question.correct_answer);
-    const shuffled = [...wrong].sort(() => Math.random() - 0.5);
-    const toRemove = shuffled.slice(0, Math.min(2, wrong.length)).map((x) => x.idx);
-    setEliminatedIndices(new Set(toRemove));
   };
 
   const questionId = question.id || BookmarkManager.generateQuestionId(question);
@@ -354,9 +374,23 @@ const QuizQuestion = ({
           {/* Bookmark and Hint */}
           <div className="flex gap-2 items-center no-print">
             <button
-              onClick={handleHintRequest}
+              onClick={(e) => {
+                handleHintRequest();
+                if (hintsUsed < 1 && hintsRemaining > 0 && !selectedAnswer && !clickedAnswer && !isTimedOut) {
+                  CelebrationManager.createRippleEffect(e.target, "rgba(255, 193, 7, 0.4)", e);
+                  CelebrationManager.triggerHapticFeedback("light");
+                }
+              }}
+              onMouseEnter={(e) => {
+                if (hintsUsed < 1 && hintsRemaining > 0 && !selectedAnswer && !clickedAnswer && !isTimedOut) {
+                  CelebrationManager.addHoverEffect(e.target, 1.1, {
+                    shadowColor: "rgba(255, 193, 7, 0.3)",
+                    duration: "0.2s",
+                  });
+                }
+              }}
               disabled={hintsUsed >= 1 || hintsRemaining <= 0 || selectedAnswer || clickedAnswer || isTimedOut || question.answers.length <= 2}
-              className={`p-2 rounded-lg transition-all duration-300 hover:scale-110 ${
+              className={`p-2 rounded-lg transition-all duration-300 hover:scale-110 ripple-container ${
                 hintsUsed >= 1 || hintsRemaining <= 0 || selectedAnswer || clickedAnswer || isTimedOut || question.answers.length <= 2
                   ? "text-gray-300 dark:text-gray-600 cursor-not-allowed"
                   : "text-yellow-500 hover:text-yellow-600"
@@ -378,8 +412,19 @@ const QuizQuestion = ({
             </div>
 
             <button
-              onClick={handleBookmarkToggle}
-              className={`p-2 rounded-lg transition-all duration-300 hover:scale-110 ${isBookmarked ? "text-orange-500 hover:text-orange-600" : "text-gray-400 dark:text-gray-500 hover:text-orange-500"}`}
+              onClick={(e) => {
+                handleBookmarkToggle();
+                CelebrationManager.createRippleEffect(e.target, "rgba(255, 152, 0, 0.4)", e);
+                CelebrationManager.bounceElement(e.target, "light");
+                CelebrationManager.triggerHapticFeedback("light");
+              }}
+              onMouseEnter={(e) => {
+                CelebrationManager.addHoverEffect(e.target, 1.1, {
+                  shadowColor: isBookmarked ? "rgba(255, 152, 0, 0.3)" : "rgba(139, 69, 19, 0.2)",
+                  duration: "0.2s",
+                });
+              }}
+              className={`p-2 rounded-lg transition-all duration-300 hover:scale-110 ripple-container ${isBookmarked ? "text-orange-500 hover:text-orange-600" : "text-gray-400 dark:text-gray-500 hover:text-orange-500"}`}
               title={isBookmarked ? "Remove bookmark" : "Bookmark this question"}
             >
               <svg
@@ -414,14 +459,21 @@ const QuizQuestion = ({
         <div className="space-y-4">
           {shuffledIndices.map((originalIndex, displayPosition) => {
             const answer = question.answers[originalIndex];
-            // Handle null/undefined answers gracefully
             if (answer == null) return null;
 
             const isEliminated = eliminatedIndices.has(originalIndex);
             return (
               <button
                 key={`${originalIndex}-${displayPosition}`}
-                onClick={() => handleAnswerClick(answer)}
+                onClick={(e) => handleAnswerClick(answer, e)}
+                onMouseEnter={(e) => {
+                  if (!selectedAnswer && !clickedAnswer && !isTimedOut && !isEliminated) {
+                    CelebrationManager.addHoverEffect(e.target, 1.03, {
+                      shadowColor: "rgba(139, 92, 246, 0.2)",
+                      duration: "0.2s",
+                    });
+                  }
+                }}
                 disabled={
                   selectedAnswer ||
                   clickedAnswer ||
@@ -436,7 +488,7 @@ const QuizQuestion = ({
                     : isShuffling
                       ? "transition-all duration-200 transform scale-98 opacity-80"
                       : "transition-all duration-300 transform scale-100 opacity-100"
-                }`}
+                } relative overflow-hidden`}
                 data-quiz-answer="true"
                 data-answer-index={originalIndex}
                 aria-hidden={isEliminated ? "true" : "false"}
