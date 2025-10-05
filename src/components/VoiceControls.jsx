@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import { useEffect, useCallback } from 'react'
 
 const VoiceControls = ({ 
   question, 
@@ -16,8 +16,7 @@ const VoiceControls = ({
   parseVoiceAnswer,
   setTranscript,
   isTimedOut,
-  showResult,
-  isAnnouncingResult
+  showResult
 }) => {
   // Automatically read out the question and options when a new question appears
   useEffect(() => {
@@ -25,10 +24,10 @@ const VoiceControls = ({
       const text = `${question.category}. ${question.question}. The options are: ${question.answers.map((ans, idx) => `${String.fromCharCode(65 + idx)}, ${ans}`).join('. ')}`;
       onSpeak(text);
     }
-  }, [question?.question]);
+  }, [question, selectedAnswer, isTimedOut, showResult, onSpeak]);
 
   // Listen for voice input and select answer if recognized
-  useEffect(() => {
+  const handleVoiceAnswer = useCallback(() => {
     if (transcript && question && !selectedAnswer && !isTimedOut && !showResult) {
       const answer = parseVoiceAnswer(transcript, question.answers);
       if (answer) {
@@ -40,7 +39,11 @@ const VoiceControls = ({
         setTranscript('');
       }
     }
-  }, [transcript]);
+  }, [transcript, question, selectedAnswer, isTimedOut, showResult, parseVoiceAnswer, onAnswerSelect, onSpeak, setTranscript]);
+
+  useEffect(() => {
+    handleVoiceAnswer();
+  }, [handleVoiceAnswer]);
 
   // Handle clicking the "read question" button
   const handleSoundClick = () => {

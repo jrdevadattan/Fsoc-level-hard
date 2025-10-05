@@ -1,10 +1,15 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import BookmarkManager from "../utils/BookmarkManager"
 import BadgeManager from "../utils/BadgeManager"
+import FeedbackManager from "../utils/FeedbackManager"
 import VoiceControls from "./VoiceControls"
 import VoiceSettings from "./VoiceSettings"
+import StarRating from "./StarRating"
+import ReportModal from "./ReportModal"
+import CommentSection from "./CommentSection"
+import ThankYouModal from "./ThankYouModal"
 import { useVoice } from "../hooks/useVoice"
 
 const QuizQuestion = ({
@@ -13,8 +18,11 @@ const QuizQuestion = ({
   selectedAnswer,
   isTimerEnabled,
   onResultAnnounced,
-  hintsRemaining, // centralized remaining hints
-  onRequestHint, // centralized hint request
+  hintsRemaining,
+  onRequestHint,
+  userId,
+  username,
+  onRatingSubmit,
 }) => {
   // Local state
   const [clickedAnswer, setClickedAnswer] = useState(null)
@@ -25,9 +33,15 @@ const QuizQuestion = ({
   const [isAnnouncingResult, setIsAnnouncingResult] = useState(false)
   const [hasResultBeenAnnounced, setHasResultBeenAnnounced] = useState(false)
   const [questionStartTime, setQuestionStartTime] = useState(null)
-  const [hintsUsed, setHintsUsed] = useState(0) // per-question usage
+  const [hintsUsed, setHintsUsed] = useState(0)
   const [showHint, setShowHint] = useState(false)
   const [eliminatedIndices, setEliminatedIndices] = useState(new Set())
+  
+  // Feedback states
+  const [showFeedbackSection, setShowFeedbackSection] = useState(false)
+  const [feedbackSummary, setFeedbackSummary] = useState(null)
+  const [showThankYouModal, setShowThankYouModal] = useState(false)
+  const [thankYouType, setThankYouType] = useState(null)
 
   const {
     isListening,
@@ -45,6 +59,38 @@ const QuizQuestion = ({
     setTranscript,
   } = useVoice()
 
+  // Initialize feedback system on mount
+  useEffect(() => {
+    FeedbackManager.initializeFeedbackSystem()
+  }, [])
+
+  const loadFeedbackSummary = useCallback(() => {
+    const questionId = question.id || BookmarkManager.generateQuestionId(question)
+    
+    try {
+      const feedback = FeedbackManager.getQuestionFeedback(questionId)
+      console.log('Loaded feedback for question:', questionId, feedback)
+      
+      if (feedback) {
+        const summary = {
+          rating: {
+            average: Number(feedback.averageRating) || 0,
+            count: Number(feedback.totalRatings) || 0
+          },
+          commentCount: Array.isArray(feedback.comments) ? feedback.comments.length : 0,
+          reported: feedback.status === 'under_review'
+        }
+        console.log('Feedback summary:', summary)
+        setFeedbackSummary(summary)
+      } else {
+        setFeedbackSummary(null)
+      }
+    } catch (error) {
+      console.error('Error loading feedback summary:', error)
+      setFeedbackSummary(null)
+    }
+  }, [question])
+
   // Reset state when question changes
   useEffect(() => {
     setClickedAnswer(null)
@@ -57,45 +103,37 @@ const QuizQuestion = ({
     setTranscript("")
     setHintsUsed(0)
     setEliminatedIndices(new Set())
+    setShowFeedbackSection(false)
 
     const questionId = question.id || BookmarkManager.generateQuestionId(question)
     setIsBookmarked(BookmarkManager.isBookmarked(questionId))
     setShowHint(false)
-  }, [question])
+
+    loadFeedbackSummary()
+  }, [question, stopSpeaking, setTranscript, loadFeedbackSummary])
 
   // Show result when answer selected or timed out
   useEffect(() => {
     if ((selectedAnswer || clickedAnswer || isTimedOut) && !showResult) {
       setShowResult(true)
     }
-  }, [selectedAnswer, clickedAnswer, isTimedOut])
+  }, [selectedAnswer, clickedAnswer, isTimedOut, showResult])
 
   // Handle answer click
   const handleAnswerClick = (answer) => {
     if (selectedAnswer || isAnnouncingResult) return
 
-    // Track answer timing for badges
     const answerTime = questionStartTime ? (Date.now() - questionStartTime) / 1000 : 0
     const isCorrect = answer === question.correct_answer
 
-    // Check for speed and streak badges
     BadgeManager.onAnswerSubmitted(isCorrect, answerTime)
 
     setClickedAnswer(answer)
     onAnswerSelect(answer)
   }
 
-  // Timer expired
-  const handleTimeOut = () => {
-    if (!selectedAnswer && !clickedAnswer) {
-      setIsTimedOut(true)
-      onAnswerSelect(null)
-    }
-  }
-
   // Hint system
   const handleHintRequest = () => {
-    // One hint per question for 50/50, and only before answering
     if (hintsUsed >= 1 || hintsRemaining <= 0 || selectedAnswer || clickedAnswer || isTimedOut) {
       return
     }
@@ -103,13 +141,11 @@ const QuizQuestion = ({
       setHintsUsed(1)
       setShowHint(true)
       eliminateTwoWrongAnswers()
-      // Track hint usage for badges
       BadgeManager.onHintUsed()
     }
   }
 
   const getHintText = () => {
-    // Show which options were eliminated (letters) if available
     if (hintsUsed === 1 && eliminatedIndices.size > 0) {
       const letters = Array.from(eliminatedIndices)
         .sort((a, b) => a - b)
@@ -124,7 +160,6 @@ const QuizQuestion = ({
     const result = BookmarkManager.toggleBookmark(question)
     if (result.success) {
       setIsBookmarked(!isBookmarked)
-      // Track bookmark for badges
       if (result.action === "added") {
         BadgeManager.onBookmarkAdded()
       }
@@ -154,7 +189,7 @@ const QuizQuestion = ({
         if (onResultAnnounced) onResultAnnounced()
       })
     }
-  }, [showResult, selectedAnswer, isTimedOut, question, hasResultBeenAnnounced])
+  }, [showResult, selectedAnswer, isTimedOut, question, hasResultBeenAnnounced, speak, onResultAnnounced])
 
   // Button classes
   const getButtonClass = (answer) => {
@@ -184,11 +219,12 @@ const QuizQuestion = ({
 
   const eliminateTwoWrongAnswers = () => {
     const wrong = question.answers.map((ans, idx) => ({ ans, idx })).filter((x) => x.ans !== question.correct_answer)
-    // Pick up to 2 random wrong answers
     const shuffled = [...wrong].sort(() => Math.random() - 0.5)
     const toRemove = shuffled.slice(0, Math.min(2, wrong.length)).map((x) => x.idx)
     setEliminatedIndices(new Set(toRemove))
   }
+
+  const questionId = question.id || BookmarkManager.generateQuestionId(question)
 
   return (
     <>
@@ -249,6 +285,16 @@ const QuizQuestion = ({
                 <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
                   💡 {hintsRemaining - hintsUsed} hint
                   {hintsRemaining - hintsUsed > 1 ? "s" : ""} remaining
+                </span>
+              )}
+              {feedbackSummary && feedbackSummary.rating.count > 0 && (
+                <span className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-sm font-medium">
+                  ⭐ {Number(feedbackSummary.rating.average).toFixed(1)} ({feedbackSummary.rating.count})
+                </span>
+              )}
+              {feedbackSummary && feedbackSummary.reported && (
+                <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-medium">
+                  🚩 Reported
                 </span>
               )}
             </div>
@@ -377,6 +423,67 @@ const QuizQuestion = ({
             </div>
           </div>
         )}
+
+        {/* Feedback Section - Shows after answer is selected */}
+        {(selectedAnswer || clickedAnswer || isTimedOut) && (
+          <div className="mt-6 space-y-4 border-t border-gray-200 pt-6">
+            {/* Star Rating */}
+            <div className="bg-purple-50 rounded-lg p-4">
+              <p className="text-sm text-gray-700 font-medium mb-3">How would you rate this question?</p>
+              <StarRating
+                questionId={questionId}
+                userId={userId}
+                onRatingSubmit={(rating) => {
+                  console.log(`Question rated: ${rating} stars`)
+                  if (onRatingSubmit) onRatingSubmit(rating)
+                  setThankYouType('rating')
+                  setShowThankYouModal(true)
+                  
+                  // Reload feedback summary after rating
+                  setTimeout(() => {
+                    loadFeedbackSummary()
+                  }, 500)
+                }}
+              />
+            </div>
+
+            {/* Report Button */}
+            <div className="flex justify-between items-center">
+              <ReportModal
+                questionId={questionId}
+                userId={userId}
+                question={question}
+                onReportSubmitted={() => {
+                  setThankYouType('report')
+                  setShowThankYouModal(true)
+                }}
+              />
+              
+              <button
+                onClick={() => setShowFeedbackSection(!showFeedbackSection)}
+                className="text-purple-600 hover:text-purple-700 text-sm font-medium transition-colors"
+              >
+                {showFeedbackSection ? "Hide Comments" : "View Comments"} 
+                {feedbackSummary?.commentCount > 0 && ` (${feedbackSummary.commentCount})`}
+              </button>
+            </div>
+
+            {/* Comment Section - Expandable */}
+            {showFeedbackSection && (
+              <div className="animate-fadeInUp">
+                <CommentSection
+                  questionId={questionId}
+                  userId={userId}
+                  username={username}
+                  onCommentPosted={() => {
+                    setThankYouType('comment')
+                    setShowThankYouModal(true)
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Voice Settings Modal */}
@@ -386,6 +493,13 @@ const QuizQuestion = ({
         voiceSettings={voiceSettings}
         availableVoices={availableVoices}
         onUpdateSettings={updateVoiceSettings}
+      />
+
+      {/* Thank You Modal */}
+      <ThankYouModal
+        isOpen={showThankYouModal}
+        onClose={() => setShowThankYouModal(false)}
+        feedbackType={thankYouType}
       />
     </>
   )

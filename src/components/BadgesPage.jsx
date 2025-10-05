@@ -16,7 +16,7 @@ const BadgesPage = () => {
 
   const loadBadgeData = () => {
     const badgesByCategory = BadgeManager.getBadgesByCategory();
-    const userBadges = BadgeManager.getUserBadges();
+    // Removed unused variable 'userBadges'
     const badgeStats = BadgeManager.getBadgeStats();
     const progress = BadgeManager.getOverallProgress();
 

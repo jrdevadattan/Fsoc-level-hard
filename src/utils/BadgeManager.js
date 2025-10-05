@@ -218,9 +218,9 @@ class BadgeManager {
   static updateBadgeStats(updates) {
     try {
       const currentStats = this.getBadgeStats() || {};
-      const updatedStats = { ...currentStats, ...updates };
-      localStorage.setItem(BADGE_STATS_KEY, JSON.stringify(updatedStats));
-      return updatedStats;
+      const newStats = { ...currentStats, ...updates };
+      localStorage.setItem(BADGE_STATS_KEY, JSON.stringify(newStats));
+      return newStats;
     } catch (error) {
       console.error('Error updating badge stats:', error);
       return null;
@@ -314,7 +314,7 @@ class BadgeManager {
     const accuracy = Math.round((score / totalQuestions) * 100);
 
     const stats = this.getBadgeStats();
-    const updatedStats = this.updateBadgeStats({
+    this.updateBadgeStats({
       quiz_count: stats.quiz_count + 1,
       total_correct_answers: stats.total_correct_answers + score,
       total_questions_answered: stats.total_questions_answered + totalQuestions,
@@ -339,7 +339,7 @@ class BadgeManager {
     const stats = this.getBadgeStats();
     const newConsecutive = isCorrect ? stats.consecutive_correct + 1 : 0;
 
-    const updatedStats = this.updateBadgeStats({
+    this.updateBadgeStats({
       consecutive_correct: newConsecutive,
       max_consecutive_correct: Math.max(stats.max_consecutive_correct, newConsecutive),
       fastest_answer_time: stats.fastest_answer_time
