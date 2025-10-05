@@ -107,7 +107,7 @@ const QuizQuestion = ({
     setTranscript("");
     setHintsUsed(0);
     setEliminatedIndices(new Set());
-    setShuffledIndices([0, 1, 2, 3]);
+    setShuffledIndices(Array.from({ length: question.answers.length }, (_, i) => i));
     setIsShuffling(false);
     setLastShuffleTime(null);
     setShuffleCounter(0);
@@ -138,14 +138,15 @@ const QuizQuestion = ({
       !isTimedOut &&
       !isTimerPaused &&
       !isAnnouncingResult &&
-      timeRemaining > 0
+      timeRemaining > 0 &&
+      question.answers.length > 2
     ) {
       setLastShuffleTime(timeRemaining);
       setShuffleCounter((prev) => prev + 1);
 
       if (shuffleCounter % 3 === 0) {
         setIsShuffling(true);
-        const newIndices = [0, 1, 2, 3].sort(() => Math.random() - 0.5);
+        const newIndices = Array.from({ length: question.answers.length }, (_, i) => i).sort(() => Math.random() - 0.5);
 
         setTimeout(() => {
           setShuffledIndices(newIndices);
@@ -163,6 +164,7 @@ const QuizQuestion = ({
     isTimerEnabled,
     lastShuffleTime,
     shuffleCounter,
+    question.answers.length,
   ]);
 
   // Handle answer click
@@ -180,7 +182,14 @@ const QuizQuestion = ({
 
   // Hint system
   const handleHintRequest = () => {
-    if (hintsUsed >= 1 || hintsRemaining <= 0 || selectedAnswer || clickedAnswer || isTimedOut) {
+    if (
+      hintsUsed >= 1 ||
+      hintsRemaining <= 0 ||
+      selectedAnswer ||
+      clickedAnswer ||
+      isTimedOut ||
+      question.answers.length <= 2
+    ) {
       return;
     }
     if (typeof onRequestHint === "function" && onRequestHint()) {
@@ -241,17 +250,14 @@ const QuizQuestion = ({
   const getButtonClass = (answer) => {
     const base = "w-full p-4 text-left rounded-lg font-medium transition-all duration-300 transform ";
     if (!selectedAnswer && !clickedAnswer && !isTimedOut) {
-      return (
-        base +
-        "bg-white hover:bg-purple-50 hover:scale-105 hover:shadow-lg text-gray-800 border-2 border-transparent hover:border-purple-300"
-      );
+      return base + "bg-white dark:bg-gray-700 hover:bg-purple-50 dark:hover:bg-gray-600 hover:scale-105 hover:shadow-lg text-gray-800 dark:text-gray-200 border-2 border-transparent hover:border-purple-300";
     }
     if (selectedAnswer || clickedAnswer || isTimedOut) {
       if (answer === question.correct_answer)
         return base + "bg-green-500 text-white border-2 border-green-600 scale-105 shadow-lg";
       if (answer === (selectedAnswer || clickedAnswer))
         return base + "bg-red-500 text-white border-2 border-red-600 scale-105 shadow-lg";
-      return base + "bg-gray-300 text-gray-600 border-2 border-gray-400";
+      return base + "bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400 border-2 border-gray-400";
     }
     return base;
   };
@@ -274,9 +280,9 @@ const QuizQuestion = ({
 
   return (
     <>
-      <div className="bg-white rounded-xl shadow-2xl p-8 max-w-3xl mx-auto relative" data-quiz-question="true">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-8 max-w-3xl mx-auto relative" data-quiz-question="true">
         {/* Voice Controls */}
-        <div className="absolute top-4 right-4 z-10">
+        <div className="absolute top-4 right-4 z-10 no-print">
           <VoiceControls
             question={question}
             onAnswerSelect={handleAnswerClick}
@@ -302,43 +308,43 @@ const QuizQuestion = ({
         <div className="mb-8 pr-48 flex justify-between items-start">
           <div>
             <div className="flex items-center gap-3 mb-4">
-              <div className="bg-purple-100 p-2 rounded-lg">
+              <div className="bg-purple-100 dark:bg-purple-900/50 p-2 rounded-lg">
                 <span className="text-2xl">🤔</span>
               </div>
-              <span className="text-sm font-semibold text-purple-600 uppercase tracking-wide">{question.category}</span>
+              <span className="text-sm font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wide">{question.category}</span>
             </div>
-            <h2 className="text-2xl md:text-3xl font-bold text-gray-800 leading-relaxed">{question.question}</h2>
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white leading-relaxed">{question.question}</h2>
 
             {/* Badges */}
             <div className="flex items-center gap-2 mt-4 flex-wrap">
-              <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+              <span className="bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300 px-3 py-1 rounded-full text-sm font-medium">
                 {question.difficulty}
               </span>
-              <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+              <span className="bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 px-3 py-1 rounded-full text-sm font-medium">
                 {question.type}
               </span>
               {isTimerEnabled && (
-                <span className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm font-medium">
+                <span className="bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300 px-3 py-1 rounded-full text-sm font-medium">
                   ⏱️ Timed
                 </span>
               )}
               {isAnnouncingResult && (
-                <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium animate-pulse">
+                <span className="bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300 px-3 py-1 rounded-full text-sm font-medium animate-pulse">
                   🔊 Announcing Result...
                 </span>
               )}
               {hintsRemaining > hintsUsed && (
-                <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
+                <span className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 px-3 py-1 rounded-full text-sm font-medium">
                   💡 {hintsRemaining - hintsUsed} hint{hintsRemaining - hintsUsed > 1 ? "s" : ""} remaining
                 </span>
               )}
               {feedbackSummary && feedbackSummary.rating.count > 0 && (
-                <span className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-sm font-medium">
+                <span className="bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 px-3 py-1 rounded-full text-sm font-medium">
                   ⭐ {Number(feedbackSummary.rating.average).toFixed(1)} ({feedbackSummary.rating.count})
                 </span>
               )}
               {feedbackSummary && feedbackSummary.reported && (
-                <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-medium">
+                <span className="bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300 px-3 py-1 rounded-full text-sm font-medium">
                   🚩 Reported
                 </span>
               )}
@@ -346,13 +352,13 @@ const QuizQuestion = ({
           </div>
 
           {/* Bookmark and Hint */}
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center no-print">
             <button
               onClick={handleHintRequest}
-              disabled={hintsUsed >= 1 || hintsRemaining <= 0 || selectedAnswer || clickedAnswer || isTimedOut}
+              disabled={hintsUsed >= 1 || hintsRemaining <= 0 || selectedAnswer || clickedAnswer || isTimedOut || question.answers.length <= 2}
               className={`p-2 rounded-lg transition-all duration-300 hover:scale-110 ${
-                hintsUsed >= 1 || hintsRemaining <= 0 || selectedAnswer || clickedAnswer || isTimedOut
-                  ? "text-gray-300 cursor-not-allowed"
+                hintsUsed >= 1 || hintsRemaining <= 0 || selectedAnswer || clickedAnswer || isTimedOut || question.answers.length <= 2
+                  ? "text-gray-300 dark:text-gray-600 cursor-not-allowed"
                   : "text-yellow-500 hover:text-yellow-600"
               }`}
               title={hintsRemaining <= 0 ? "No hints remaining" : "Use 50/50 hint"}
@@ -367,13 +373,13 @@ const QuizQuestion = ({
               </svg>
             </button>
 
-            <div className="px-2 py-1 rounded-md text-sm font-semibold bg-yellow-100 text-yellow-800" aria-live="polite">
+            <div className="px-2 py-1 rounded-md text-sm font-semibold bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300" aria-live="polite">
               {hintsRemaining} left
             </div>
 
             <button
               onClick={handleBookmarkToggle}
-              className={`p-2 rounded-lg transition-all duration-300 hover:scale-110 ${isBookmarked ? "text-orange-500 hover:text-orange-600" : "text-gray-400 hover:text-orange-500"}`}
+              className={`p-2 rounded-lg transition-all duration-300 hover:scale-110 ${isBookmarked ? "text-orange-500 hover:text-orange-600" : "text-gray-400 dark:text-gray-500 hover:text-orange-500"}`}
               title={isBookmarked ? "Remove bookmark" : "Bookmark this question"}
             >
               <svg
@@ -395,12 +401,12 @@ const QuizQuestion = ({
 
         {/* Hint Display */}
         {showHint && (
-          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg animate-fadeInUp">
+          <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/50 rounded-lg animate-fadeInUp">
             <div className="flex items-center gap-2 mb-2">
-              <div className="text-yellow-600">💡</div>
-              <span className="font-semibold text-yellow-800">Hint:</span>
+              <div className="text-yellow-600 dark:text-yellow-400">💡</div>
+              <span className="font-semibold text-yellow-800 dark:text-yellow-200">Hint:</span>
             </div>
-            <p className="text-yellow-700">{getHintText()}</p>
+            <p className="text-yellow-700 dark:text-yellow-300">{getHintText()}</p>
           </div>
         )}
 
@@ -408,6 +414,9 @@ const QuizQuestion = ({
         <div className="space-y-4">
           {shuffledIndices.map((originalIndex, displayPosition) => {
             const answer = question.answers[originalIndex];
+            // Handle null/undefined answers gracefully
+            if (answer == null) return null;
+
             const isEliminated = eliminatedIndices.has(originalIndex);
             return (
               <button
@@ -435,7 +444,7 @@ const QuizQuestion = ({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div
-                      className={`flex-shrink-0 w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-bold transition-all duration-200 ${
+                      className={`flex-shrink-0 w-8 h-8 bg-purple-100 dark:bg-purple-900/50 rounded-full flex items-center justify-center text-purple-600 dark:text-purple-300 font-bold transition-all duration-200 ${
                         isShuffling ? "animate-pulse" : ""
                       }`}
                     >
@@ -452,12 +461,12 @@ const QuizQuestion = ({
 
         {/* Result */}
         {(selectedAnswer || clickedAnswer || isTimedOut) && (
-          <div className="mt-6 p-4 rounded-lg bg-gray-50">
+          <div className="mt-6 p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50">
             <div className="flex items-center gap-2 flex-wrap">
               {isTimedOut && !selectedAnswer && !clickedAnswer ? (
                 <>
                   <span className="text-2xl">⏱️</span>
-                  <span className="text-orange-600 font-semibold text-lg">
+                  <span className="text-orange-600 dark:text-orange-400 font-semibold text-lg">
                     Time's up! The correct answer was: {question.correct_answer} (Option{" "}
                     {String.fromCharCode(65 + question.answers.indexOf(question.correct_answer))})
                   </span>
@@ -465,12 +474,12 @@ const QuizQuestion = ({
               ) : (selectedAnswer || clickedAnswer) === question.correct_answer ? (
                 <>
                   <span className="text-2xl">🎉</span>
-                  <span className="text-green-600 font-semibold text-lg">Correct!</span>
+                  <span className="text-green-600 dark:text-green-400 font-semibold text-lg">Correct!</span>
                 </>
               ) : (
                 <>
                   <span className="text-2xl">😔</span>
-                  <span className="text-red-600 font-semibold text-lg">
+                  <span className="text-red-600 dark:text-red-400 font-semibold text-lg">
                     Incorrect. The correct answer is: {question.correct_answer} (Option{" "}
                     {String.fromCharCode(65 + question.answers.indexOf(question.correct_answer))})
                   </span>
@@ -482,10 +491,10 @@ const QuizQuestion = ({
 
         {/* Feedback Section - Shows after answer is selected */}
         {(selectedAnswer || clickedAnswer || isTimedOut) && (
-          <div className="mt-6 space-y-4 border-t border-gray-200 pt-6">
+          <div className="mt-6 space-y-4 border-t border-gray-200 dark:border-gray-700 pt-6">
             {/* Star Rating */}
-            <div className="bg-purple-50 rounded-lg p-4">
-              <p className="text-sm text-gray-700 font-medium mb-3">How would you rate this question?</p>
+            <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4">
+              <p className="text-sm text-gray-700 dark:text-gray-300 font-medium mb-3">How would you rate this question?</p>
               <StarRating
                 questionId={questionId}
                 userId={userId}
@@ -515,7 +524,7 @@ const QuizQuestion = ({
               
               <button
                 onClick={() => setShowFeedbackSection(!showFeedbackSection)}
-                className="text-purple-600 hover:text-purple-700 text-sm font-medium transition-colors"
+                className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 text-sm font-medium transition-colors"
               >
                 {showFeedbackSection ? "Hide Comments" : "View Comments"} 
                 {feedbackSummary?.commentCount > 0 && ` (${feedbackSummary.commentCount})`}
@@ -532,6 +541,7 @@ const QuizQuestion = ({
                   onCommentPosted={() => {
                     setThankYouType('comment');
                     setShowThankYouModal(true);
+                    loadFeedbackSummary();
                   }}
                 />
               </div>
