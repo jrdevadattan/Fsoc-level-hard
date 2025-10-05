@@ -7,6 +7,15 @@ import QuizReview from "./QuizReview";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 import QRCode from "qrcode";
+import BonusSpinWheel from "./BonusSpinWheel";
+import { computeBasePoints, applyBonus } from "../utils/Points";
+import BonusManager from "../utils/BonusManager";
+import CelebrationOverlay from "./CelebrationOverlay";
+import AnimatedScore from "./AnimatedScore";
+import StreakCelebration from "./StreakCelebration";
+import BadgeRevealAnimation from "./BadgeRevealAnimation";
+import LevelUpAnimation from "./LevelUpAnimation";
+import CelebrationManager from "../utils/CelebrationManager";
 
 const QuizResults = ({
     score,
@@ -40,6 +49,18 @@ const QuizResults = ({
         }
     }, [score, totalQuestions, quizData]);
 
+    // Celebration states
+    const [celebrationType, setCelebrationType] = useState(null);
+    const [showCelebration, setShowCelebration] = useState(false);
+    const [celebrationData, setCelebrationData] = useState({});
+    const [currentBadgeToReveal, setCurrentBadgeToReveal] = useState(null);
+    const [showBadgeReveal, setShowBadgeReveal] = useState(false);
+    const [showLevelUp, setShowLevelUp] = useState(false);
+    const [levelUpData, setLevelUpData] = useState({});
+    const [streakData, setStreakData] = useState(null);
+    const [showStreak, setShowStreak] = useState(false);
+    const [scoreAnimationComplete, setScoreAnimationComplete] = useState(false);
+
     const generateQRCode = useCallback(async () => {
         try {
             const shareUrl = `${window.location.origin}?score=${score}&total=${totalQuestions}&percent=${percentage}`;
@@ -59,7 +80,83 @@ const QuizResults = ({
 
     useEffect(() => {
         generateQRCode();
-    }, [generateQRCode]);
+
+        const earnedBadges = BadgeManager.onQuizCompleted({
+            score,
+            totalQuestions,
+            timeSpent: quizData.timeSpent || 0,
+            averageTimePerQuestion: quizData.averageTimePerQuestion || 30,
+        });
+
+        if (earnedBadges.length > 0) {
+            setNewBadges(earnedBadges);
+            setShowAchievements(true);
+        }
+
+        // initialize final points as base (before spin)
+        setFinalPoints(basePoints);
+
+        // Initialize celebration sequence
+        setTimeout(() => {
+            triggerCelebrationSequence();
+        }, 500);
+    }, [
+        score,
+        totalQuestions,
+        quizData,
+        basePoints,
+        generateQRCode,
+        newBadges,
+    ]);
+
+    const triggerCelebrationSequence = () => {
+        let delay = 0;
+
+        if (percentage === 100) {
+            setCelebrationType("perfectScore");
+            setCelebrationData({ percentage });
+            setShowCelebration(true);
+            delay += 4000;
+        } else if (percentage >= 80) {
+            setCelebrationType("highScore");
+            setCelebrationData({ percentage });
+            setShowCelebration(true);
+            delay += 3500;
+        }
+
+        if (quizData.streak && quizData.streak >= 5) {
+            setTimeout(() => {
+                setStreakData({ count: quizData.streak });
+                setShowStreak(true);
+            }, delay);
+            delay += 3000;
+        }
+
+        if (newBadges.length > 0) {
+            setTimeout(() => {
+                setCurrentBadgeToReveal(newBadges[0]);
+                setShowBadgeReveal(true);
+            }, delay);
+            delay += 4000;
+        }
+
+        if (quizData.levelUp) {
+            setTimeout(() => {
+                setLevelUpData({
+                    currentLevel: quizData.previousLevel || 1,
+                    newLevel: quizData.currentLevel || 2,
+                    currentXP: quizData.currentXP || 0,
+                    xpToNextLevel: quizData.xpToNextLevel || 100,
+                    benefits: quizData.levelBenefits || [
+                        "New quiz categories unlocked",
+                        "Extended time bonuses",
+                        "Advanced statistics",
+                    ],
+                });
+                setShowLevelUp(true);
+            }, delay);
+        }
+    };
 
     const getResultMessage = () => {
         if (percentage >= 90)
@@ -306,6 +403,94 @@ const QuizResults = ({
                 }
             `}</style>
 
+            {showCelebration && (
+                <CelebrationOverlay
+                    type={celebrationType}
+                    isVisible={showCelebration}
+                    onComplete={() => setShowCelebration(false)}
+                    data={celebrationData}
+                    duration={percentage === 100 ? 5000 : 3000}
+                />
+            )}
+
+            {showStreak && (
+                <StreakCelebration
+                    streakCount={streakData?.count}
+                    isVisible={showStreak}
+                    onComplete={() => setShowStreak(false)}
+                    position="center"
+                />
+            )}
+
+            {showBadgeReveal && currentBadgeToReveal && (
+                <BadgeRevealAnimation
+                    badge={currentBadgeToReveal}
+                    isVisible={showBadgeReveal}
+                    onComplete={() => {
+                        setShowBadgeReveal(false);
+                        setCurrentBadgeToReveal(null);
+                    }}
+                    showShareButton={true}
+                />
+            )}
+
+            {showLevelUp && (
+                <LevelUpAnimation
+                    currentLevel={levelUpData.currentLevel}
+                    newLevel={levelUpData.newLevel}
+                    currentXP={levelUpData.currentXP}
+                    xpToNextLevel={levelUpData.xpToNextLevel}
+                    isVisible={showLevelUp}
+                    onComplete={() => setShowLevelUp(false)}
+                    benefits={levelUpData.benefits}
+                />
+            )}
+
+            {showWheel && (
+                <BonusSpinWheel
+                    isOpen={showWheel}
+                    quizScore={score}
+                    onRewardWon={(reward) => {
+                        const normalized = reward.isMultiplier
+                            ? {
+                                  type: "multiplier",
+                                  value: reward.value,
+                                  label: reward.label,
+                                  points: 0,
+                                  isMultiplier: true,
+                              }
+                            : {
+                                  type: "points",
+                                  value: reward.points,
+                                  label: reward.label,
+                                  points: reward.points,
+                                  isMultiplier: false,
+                              };
+
+                        const { finalPoints: fp } = applyBonus(
+                            basePoints,
+                            normalized,
+                        );
+                        setBonusReward(normalized);
+                        setFinalPoints(fp);
+                        setShowWheel(false);
+
+                        BonusManager.saveBonusToHistory(
+                            {
+                                label: normalized.label,
+                                points: normalized.points,
+                                isMultiplier: normalized.isMultiplier,
+                            },
+                            basePoints,
+                            fp,
+                            totalQuestions,
+                        );
+                        BonusManager.markWheelSpun(fp - basePoints);
+                    }}
+                    onClose={() => setShowWheel(false)}
+                />
+            )}
+
             {showAchievements && (
                 <AchievementNotification
                     badges={newBadges}
@@ -316,14 +501,31 @@ const QuizResults = ({
                 />
             )}
 
-            <div className="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center p-2 sm:p-4 md:p-6">
-                <div className="max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg w-full">
-                    <div
-                        id="quiz-results-card"
-                        className="print-content bg-white rounded-xl sm:rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8 text-center"
-                    >
-                        <div className="text-4xl sm:text-6xl md:text-8xl mb-4 sm:mb-6 animate-bounce">
-                            {result.emoji}
+                    <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-4 sm:mb-6">
+                        Quiz Complete!
+                    </h2>
+
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg sm:rounded-xl p-4 sm:p-6 mb-6 sm:mb-8">
+                        <AnimatedScore
+                            score={score}
+                            totalQuestions={totalQuestions}
+                            onAnimationComplete={() =>
+                                setScoreAnimationComplete(true)
+                            }
+                            duration={2000}
+                            showPercentage={true}
+                            showConfetti={!showCelebration}
+                            className="mb-4"
+                        />
+
+                        <div
+                            className={`text-lg font-semibold ${result.color} mb-2 transition-all duration-300`}
+                        >
+                            {result.message}
+                        </div>
+                        <div className="text-sm text-gray-600 dark:text-gray-300">
+                            Points: {finalPoints}{" "}
+                            {bonusReward ? `(base ${basePoints} + bonus)` : ""}
                         </div>
 
                         <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 mb-4 sm:mb-6">
@@ -340,7 +542,37 @@ const QuizResults = ({
                             <div
                                 className={`text-lg font-semibold ${result.color} mb-4`}
                             >
-                                {result.message}
+                                <circle
+                                    cx="60"
+                                    cy="60"
+                                    r="50"
+                                    fill="none"
+                                    stroke="#e5e7eb"
+                                    strokeWidth="8"
+                                />
+                                <circle
+                                    cx="60"
+                                    cy="60"
+                                    r="50"
+                                    fill="none"
+                                    stroke="#8b5cf6"
+                                    strokeWidth="8"
+                                    strokeLinecap="round"
+                                    strokeDasharray={`${(percentage / 100) * 314} 314`}
+                                    className="transition-all duration-2000 ease-out"
+                                    style={{
+                                        strokeDasharray: scoreAnimationComplete
+                                            ? `${(percentage / 100) * 314} 314`
+                                            : "0 314",
+                                        transition:
+                                            "stroke-dasharray 2s ease-out",
+                                    }}
+                                />
+                            </svg>
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                                    {scoreAnimationComplete ? percentage : 0}%
+                                </span>
                             </div>
 
                             <div className="relative w-32 h-32 mx-auto mb-4">
@@ -422,22 +654,64 @@ const QuizResults = ({
 
                     <div className="space-y-3 mb-8 no-print mt-6">
                         <button
-                            onClick={onRestart}
-                            className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold py-4 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg"
+                            onClick={(e) => {
+                                CelebrationManager.createRippleEffect(
+                                    e.target,
+                                    "rgba(255, 255, 255, 0.3)",
+                                    e,
+                                );
+                                onRestart();
+                            }}
+                            className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold py-4 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg ripple-container"
+                            onMouseEnter={(e) =>
+                                CelebrationManager.addHoverEffect(
+                                    e.target,
+                                    1.05,
+                                    { shadowColor: "rgba(139, 92, 246, 0.4)" },
+                                )
+                            }
                         >
                             🔄 Try Again
                         </button>
 
                         <button
-                            onClick={onBackToSetup}
-                            className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-black font-bold py-4 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg"
+                            onClick={(e) => {
+                                CelebrationManager.createRippleEffect(
+                                    e.target,
+                                    "rgba(255, 255, 255, 0.3)",
+                                    e,
+                                );
+                                onBackToSetup();
+                            }}
+                            className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-black font-bold py-4 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg ripple-container"
+                            onMouseEnter={(e) =>
+                                CelebrationManager.addHoverEffect(
+                                    e.target,
+                                    1.05,
+                                    { shadowColor: "rgba(255, 193, 7, 0.4)" },
+                                )
+                            }
                         >
                             ⚙️ Back to Setup
                         </button>
 
                         <button
-                            onClick={handleReviewAnswers}
-                            className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold py-4 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg"
+                            onClick={(e) => {
+                                CelebrationManager.createRippleEffect(
+                                    e.target,
+                                    "rgba(255, 255, 255, 0.3)",
+                                    e,
+                                );
+                                handleReviewAnswers();
+                            }}
+                            className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold py-4 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg ripple-container"
+                            onMouseEnter={(e) =>
+                                CelebrationManager.addHoverEffect(
+                                    e.target,
+                                    1.05,
+                                    { shadowColor: "rgba(99, 102, 241, 0.4)" },
+                                )
+                            }
                         >
                             📝 Review Answers
                         </button>
