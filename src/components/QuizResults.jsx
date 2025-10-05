@@ -33,11 +33,21 @@ const QuizResults = ({
     const [linkCopied, setLinkCopied] = useState(false);
     const [qrCodeUrl, setQrCodeUrl] = useState("");
 
-    // Points and bonus state
-    const basePoints = computeBasePoints(questions, userAnswers);
-    const [bonusReward, setBonusReward] = useState(null);
-    const [finalPoints, setFinalPoints] = useState(basePoints);
-    const [showWheel, setShowWheel] = useState(BonusManager.canSpin());
+    useEffect(() => {
+        BadgeManager.initializeBadgeSystem();
+
+        const earnedBadges = BadgeManager.onQuizCompleted({
+            score,
+            totalQuestions,
+            timeSpent: quizData.timeSpent || 0,
+            averageTimePerQuestion: quizData.averageTimePerQuestion || 30,
+        });
+
+        if (earnedBadges.length > 0) {
+            setNewBadges(earnedBadges);
+            setShowAchievements(true);
+        }
+    }, [score, totalQuestions, quizData]);
 
     // Celebration states
     const [celebrationType, setCelebrationType] = useState(null);
@@ -69,7 +79,6 @@ const QuizResults = ({
     }, [score, totalQuestions, percentage]);
 
     useEffect(() => {
-        BadgeManager.initializeBadgeSystem();
         generateQRCode();
 
         const earnedBadges = BadgeManager.onQuizCompleted({
@@ -235,7 +244,7 @@ const QuizResults = ({
 
             if (quizData.timeSpent) {
                 const minutes = Math.floor(quizData.timeSpent / 60);
-                const seconds = Math.floor(quizData.timeSpent % 60);
+                const seconds = quizData.timeSpent % 60;
                 doc.text(`Total Time Spent: ${minutes}m ${seconds}s`, 25, 125);
             }
 
@@ -491,14 +500,6 @@ const QuizResults = ({
                     }}
                 />
             )}
-            <div className="min-h-screen theme-screen flex items-center justify-center p-2 sm:p-4 md:p-6">
-                <div
-                    id="quiz-results-card"
-                    className="print-content app-card rounded-xl sm:rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8 max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg w-full text-center"
-                >
-                    <div className="text-4xl sm:text-6xl md:text-8xl mb-4 sm:mb-6 animate-bounce">
-                        {result.emoji}
-                    </div>
 
                     <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-4 sm:mb-6">
                         Quiz Complete!
@@ -527,10 +528,19 @@ const QuizResults = ({
                             {bonusReward ? `(base ${basePoints} + bonus)` : ""}
                         </div>
 
-                        <div className="relative w-32 h-32 mx-auto my-4">
-                            <svg
-                                className="w-32 h-32 transform -rotate-90"
-                                viewBox="0 0 120 120"
+                        <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 mb-4 sm:mb-6">
+                            Quiz Complete!
+                        </h2>
+
+                        <div className="bg-gray-50 rounded-lg sm:rounded-xl p-4 sm:p-6 mb-6 sm:mb-8">
+                            <div className="text-3xl sm:text-4xl md:text-6xl font-bold text-gray-800 mb-2">
+                                {score}/{totalQuestions}
+                            </div>
+                            <div className="text-xl text-gray-600 mb-4">
+                                {percentage}% Correct
+                            </div>
+                            <div
+                                className={`text-lg font-semibold ${result.color} mb-4`}
                             >
                                 <circle
                                     cx="60"
@@ -564,53 +574,85 @@ const QuizResults = ({
                                     {scoreAnimationComplete ? percentage : 0}%
                                 </span>
                             </div>
-                        </div>
-                    </div>
 
-                    <div className="grid grid-cols-2 gap-4 mb-6">
-                        <div className="bg-green-50 dark:bg-green-900/50 p-4 rounded-lg">
-                            <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                                {score}
-                            </div>
-                            <div className="text-sm text-green-700 dark:text-green-300">
-                                Correct
+                            <div className="relative w-32 h-32 mx-auto mb-4">
+                                <svg
+                                    className="w-32 h-32 transform -rotate-90"
+                                    viewBox="0 0 120 120"
+                                >
+                                    <circle
+                                        cx="60"
+                                        cy="60"
+                                        r="50"
+                                        fill="none"
+                                        stroke="#e5e7eb"
+                                        strokeWidth="8"
+                                    />
+                                    <circle
+                                        cx="60"
+                                        cy="60"
+                                        r="50"
+                                        fill="none"
+                                        stroke="#8b5cf6"
+                                        strokeWidth="8"
+                                        strokeLinecap="round"
+                                        strokeDasharray={`${(percentage / 100) * 314} 314`}
+                                        className="transition-all duration-1000 ease-out"
+                                    />
+                                </svg>
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <span className="text-2xl font-bold text-purple-600">
+                                        {percentage}%
+                                    </span>
+                                </div>
                             </div>
                         </div>
-                        <div className="bg-red-50 dark:bg-red-900/50 p-4 rounded-lg">
-                            <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-                                {totalQuestions - score}
-                            </div>
-                            <div className="text-sm text-red-700 dark:text-red-300">
-                                Incorrect
-                            </div>
-                        </div>
-                    </div>
 
-                    {qrCodeUrl && (
-                        <div className="mb-6 no-print">
-                            <p className="text-sm text-gray-500 mb-2">
-                                Scan to share:
+                        <div className="grid grid-cols-2 gap-4 mb-8">
+                            <div className="bg-green-50 p-4 rounded-lg">
+                                <div className="text-2xl font-bold text-green-600">
+                                    {score}
+                                </div>
+                                <div className="text-sm text-green-700">
+                                    Correct
+                                </div>
+                            </div>
+                            <div className="bg-red-50 p-4 rounded-lg">
+                                <div className="text-2xl font-bold text-red-600">
+                                    {totalQuestions - score}
+                                </div>
+                                <div className="text-sm text-red-700">
+                                    Incorrect
+                                </div>
+                            </div>
+                        </div>
+
+                        {qrCodeUrl && (
+                            <div className="mb-6 no-print">
+                                <p className="text-sm text-gray-500 mb-2">
+                                    Scan to share:
+                                </p>
+                                <div className="flex justify-center">
+                                    <img
+                                        src={qrCodeUrl}
+                                        alt="QR Code for sharing results"
+                                        className="border border-gray-200 rounded-lg"
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="print-only mb-6">
+                            <p className="text-sm text-gray-600">
+                                Quiz completed on {new Date().toLocaleDateString()}
                             </p>
-                            <div className="flex justify-center">
-                                <img
-                                    src={qrCodeUrl}
-                                    alt="QR Code for sharing results"
-                                    className="border border-gray-200 rounded-lg"
-                                />
-                            </div>
+                            <p className="text-sm text-gray-600">
+                                Generated by Quiz Challenge App
+                            </p>
                         </div>
-                    )}
-
-                    <div className="print-only mb-6">
-                        <p className="text-sm text-gray-600">
-                            Quiz completed on {new Date().toLocaleDateString()}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                            Generated by Quiz Challenge App
-                        </p>
                     </div>
 
-                    <div className="space-y-3 mb-8 no-print">
+                    <div className="space-y-3 mb-8 no-print mt-6">
                         <button
                             onClick={(e) => {
                                 CelebrationManager.createRippleEffect(
