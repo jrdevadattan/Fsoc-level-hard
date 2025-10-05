@@ -8,8 +8,9 @@ import PrivacySettings from "./components/PrivacySettings";
 import CookiePolicy from "./components/CookiePolicy";
 import ConsentProvider from "./context/ConsentContext";
 import FooterPrivacy from "./components/FooterPrivacy";
+import NavBar from "./components/NavBar";
+import NotFoundPage from "./pages/NotFoundPage";
 import FAQPage from "./components/FAQPage";
-
 
 function ProtectedRoute({ children }) {
     const { isAuthenticated, isLoading } = useAuth();
@@ -28,14 +29,12 @@ function ProtectedRoute({ children }) {
 function App() {
     return (
         <Router>
-
             <ConsentProvider>
+                <NavBar />
                 <Routes>
-
                     <Route path="/auth" element={<AuthPage />} />
                     <Route path="/faq" element={<FAQPage />} />
                     <Route path="/settings/privacy" element={<PrivacySettings />} />
-
                     <Route path="/privacy/cookies" element={<CookiePolicy />} />
                     
                     <Route
@@ -62,10 +61,11 @@ function App() {
                             </ProtectedRoute>
                         }
                     />
+
+                    <Route path="*" element={<NotFoundPage />} />
                 </Routes>
                 <FooterPrivacy />
             </ConsentProvider>
-
         </Router>
     );
 }

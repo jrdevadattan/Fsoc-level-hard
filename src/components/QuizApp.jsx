@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import QuizQuestion from "./QuizQuestion";
 import QuizResults from "./QuizResults";
 import QuizReviewWrapper from "./QuizReviewWrapper";
@@ -18,7 +18,14 @@ import BadgeManager from "../utils/BadgeManager";
 import ConsentManager from "../utils/ConsentManager";
 import BonusManager from "../utils/BonusManager";
 
-const QuizApp = () => {
+const QuizApp = ({
+    startImmediately = false,
+    initialPreferences = null,
+    sessionId = null, // sessionId is available but not used in the current logic, can be integrated later
+    currentQuestionNumber,
+    onQuestionChange,
+    onComplete,
+}) => {
     // ---------- Core Quiz State ----------
     const [questions, setQuestions] = useState([]);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -34,7 +41,7 @@ const QuizApp = () => {
     const [error, setError] = useState(null);
 
     // ---------- Quiz Setup State ----------
-    const [showSetup, setShowSetup] = useState(true);
+    const [showSetup, setShowSetup] = useState(!startImmediately);
     const [selectedCategory, setSelectedCategory] = useState("");
 
     // ---------- Timer State ----------
@@ -182,9 +189,28 @@ const QuizApp = () => {
             const prefRaw =
                 (ConsentManager && ConsentManager.getItem && ConsentManager.getItem("quizPreferences")) ||
                 localStorage.getItem("quizPreferences");
-            let prefs = null;
+            let stored = null;
             if (prefRaw) {
-                try { prefs = JSON.parse(prefRaw); } catch { prefs = null; }
+                try {
+                    stored = JSON.parse(prefRaw);
+                } catch {
+                    stored = null;
+                }
+            }
+
+            // Merge URL-provided preferences into stored preferences
+            let prefs = stored || {};
+            if (initialPreferences) {
+                prefs = {
+                    ...prefs,
+                    numQuestions: initialPreferences.numQuestions ?? prefs.numQuestions,
+                    category: {
+                        id: initialPreferences.categoryId ?? prefs?.category?.id,
+                        name: initialPreferences.categoryName ?? prefs?.category?.name,
+                    },
+                    difficulty: initialPreferences.difficulty ?? prefs.difficulty,
+                    questionType: initialPreferences.type ?? prefs.questionType,
+                };
             }
 
             const amount = prefs?.numQuestions || 10;
@@ -193,6 +219,7 @@ const QuizApp = () => {
             const type = prefs?.questionType || null;
 
             if (prefs?.category?.name) setSelectedCategory(prefs.category.name);
+            else if (initialPreferences?.categoryName) setSelectedCategory(initialPreferences.categoryName);
 
             const buildUrl = (p) => `https://opentdb.com/api.php?${p.toString()}`;
             const makeParams = (opts) => {
@@ -280,7 +307,7 @@ const QuizApp = () => {
         } finally {
             setIsLoading(false);
         }
-    }, [timerDuration, isTimerEnabled]);
+    }, [timerDuration, isTimerEnabled, initialPreferences]);
 
     // ---------- Auto-save every 5s ----------
     useEffect(() => {
@@ -389,6 +416,53 @@ const QuizApp = () => {
     const handleTimerWarning = () => console.log("Timer warning: 10 seconds remaining");
     const handleResultAnnounced = () => setIsResultAnnouncementComplete(true);
 
+    // Sync external currentQuestionNumber to internal state when provided
+    useEffect(() => {
+        if (typeof currentQuestionNumber !== "number") return;
+        if (questions.length === 0) return;
+        const idx = Math.max(0, Math.min(questions.length - 1, currentQuestionNumber - 1));
+        if (idx !== currentQuestionIndex) {
+            setCurrentQuestionIndex(idx);
+        }
+    }, [currentQuestionNumber, questions.length, currentQuestionIndex]);
+
+    // Notify caller of question changes
+    useEffect(() => {
+        if (typeof onQuestionChange === "function" && questions.length > 0) {
+            onQuestionChange(currentQuestionIndex + 1);
+        }
+    }, [currentQuestionIndex, questions.length, onQuestionChange]);
+
+    // Notify completion to caller once
+    const completionSentRef = useRef(false);
+    useEffect(() => {
+        if (!quizCompleted) return;
+        if (completionSentRef.current) return;
+        if (typeof onComplete !== "function") return;
+        
+        completionSentRef.current = true;
+        const timeSpent = quizStartTimestamp
+            ? (Date.now() - quizStartTimestamp) / 1000
+            : 0;
+        const avgTime = questions.length ? timeSpent / questions.length : 0;
+        
+        try {
+            onComplete({
+                score,
+                totalQuestions: questions.length,
+                questions,
+                userAnswers: selectedAnswers.map((a) => a.selectedAnswer),
+                quizData: {
+                    timeSpent,
+                    averageTimePerQuestion: avgTime,
+                    hintsUsed: totalHintsUsed,
+                },
+            });
+        } catch (e) {
+            console.error("Error in onComplete callback:", e);
+        }
+    }, [quizCompleted, onComplete, questions, score, selectedAnswers, quizStartTimestamp, totalHintsUsed]);
+
     // ---------- Back to Setup ----------
     const handleBackToSetup = useCallback(() => {
         QuizStateManager.clearQuizState();
@@ -489,8 +563,14 @@ const QuizApp = () => {
     }
 
     if (quizCompleted) {
+        // If consumer provided onComplete, delegate navigation/results to the caller
+        if (typeof onComplete === "function") {
+            return null; // The parent component is now in charge of what to render
+        }
+
         const timeSpent = quizStartTimestamp ? (Date.now() - quizStartTimestamp) / 1000 : 0;
         const avgTime = questions.length ? timeSpent / questions.length : 0;
+
         return (
             <>
                 <KeyboardShortcuts />
