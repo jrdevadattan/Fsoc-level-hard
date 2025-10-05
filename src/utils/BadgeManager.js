@@ -172,7 +172,6 @@ class BadgeManager {
 
   static initializeBadgeSystem() {
     if (!ConsentManager.hasConsent(ConsentManager.categories.functional)) {
-      // Do not initialize storage if no functional consent
       return;
     }
     const existingBadges = this.getUserBadges();
