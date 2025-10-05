@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import BookmarkManager from "../utils/BookmarkManager";
 import BadgeManager from "../utils/BadgeManager";
 import VoiceControls from "./VoiceControls";
@@ -13,12 +13,11 @@ const QuizQuestion = ({
     selectedAnswer,
     isTimerEnabled,
     onResultAnnounced,
-    hintsRemaining, // centralized remaining hints
-    onRequestHint, // centralized hint request
-    timeRemaining, // timer value for shuffle synchronization
-    isTimerPaused, // pause state for shuffle control
+    hintsRemaining,
+    onRequestHint,
+    timeRemaining,
+    isTimerPaused,
 }) => {
-    // Local state
     const [clickedAnswer, setClickedAnswer] = useState(null);
     const [isBookmarked, setIsBookmarked] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -27,7 +26,7 @@ const QuizQuestion = ({
     const [isAnnouncingResult, setIsAnnouncingResult] = useState(false);
     const [hasResultBeenAnnounced, setHasResultBeenAnnounced] = useState(false);
     const [questionStartTime, setQuestionStartTime] = useState(null);
-    const [hintsUsed, setHintsUsed] = useState(0); // per-question usage
+    const [hintsUsed, setHintsUsed] = useState(0);
     const [showHint, setShowHint] = useState(false);
     const [eliminatedIndices, setEliminatedIndices] = useState(new Set());
     const [shuffledIndices, setShuffledIndices] = useState([]);
@@ -51,7 +50,6 @@ const QuizQuestion = ({
         setTranscript,
     } = useVoice();
 
-    // Reset state when question changes
     useEffect(() => {
         setClickedAnswer(null);
         setIsTimedOut(false);
@@ -63,30 +61,24 @@ const QuizQuestion = ({
         setTranscript("");
         setHintsUsed(0);
         setEliminatedIndices(new Set());
-        // FIX: Initialize indices based on the actual number of answers
         setShuffledIndices(
-            Array.from({ length: question.answers.length }, (_, i) => i).sort(
-                () => Math.random() - 0.5
-            )
+            Array.from({ length: question.answers.length }, (_, i) => i)
         );
         setIsShuffling(false);
         setLastShuffleTime(null);
         setShuffleCounter(0);
 
-        const questionId =
-            question.id || BookmarkManager.generateQuestionId(question);
+        const questionId = question.id || BookmarkManager.generateQuestionId(question);
         setIsBookmarked(BookmarkManager.isBookmarked(questionId));
         setShowHint(false);
-    }, [question]);
+    }, [question, stopSpeaking, setTranscript]);
 
-    // Show result when answer selected or timed out
     useEffect(() => {
         if ((selectedAnswer || clickedAnswer || isTimedOut) && !showResult) {
             setShowResult(true);
         }
-    }, [selectedAnswer, clickedAnswer, isTimedOut]);
+    }, [selectedAnswer, clickedAnswer, isTimedOut, showResult]);
 
-    // Timer-synchronized shuffle effect (every 3 seconds)
     useEffect(() => {
         if (
             isTimerEnabled &&
@@ -98,20 +90,14 @@ const QuizQuestion = ({
             !isTimerPaused &&
             !isAnnouncingResult &&
             timeRemaining > 0 &&
-            question.answers.length > 2 // Only shuffle multiple choice
+            question.answers.length > 2
         ) {
             setLastShuffleTime(timeRemaining);
             setShuffleCounter((prev) => prev + 1);
 
-            // Only shuffle every 3 seconds
             if (shuffleCounter % 3 === 0) {
                 setIsShuffling(true);
-
-                // FIX: Create new shuffled order based on actual answer count
-                const newIndices = Array.from({ length: question.answers.length }, (_, i) => i).sort(
-                    () => Math.random() - 0.5
-                );
-
+                const newIndices = Array.from({ length: question.answers.length }, (_, i) => i).sort(() => Math.random() - 0.5);
                 setTimeout(() => {
                     setShuffledIndices(newIndices);
                     setTimeout(() => setIsShuffling(false), 150);
@@ -131,22 +117,15 @@ const QuizQuestion = ({
         question.answers.length,
     ]);
 
-    // Handle answer click
     const handleAnswerClick = (answer) => {
         if (selectedAnswer || isAnnouncingResult) return;
-
-        const answerTime = questionStartTime
-            ? (Date.now() - questionStartTime) / 1000
-            : 0;
+        const answerTime = questionStartTime ? (Date.now() - questionStartTime) / 1000 : 0;
         const isCorrect = answer === question.correct_answer;
-
         BadgeManager.onAnswerSubmitted(isCorrect, answerTime);
-
         setClickedAnswer(answer);
         onAnswerSelect(answer);
     };
 
-    // Hint system
     const handleHintRequest = () => {
         if (
             hintsUsed >= 1 ||
@@ -154,7 +133,7 @@ const QuizQuestion = ({
             selectedAnswer ||
             clickedAnswer ||
             isTimedOut ||
-            question.answers.length <= 2 // Can't use 50/50 on True/False
+            question.answers.length <= 2
         ) {
             return;
         }
@@ -164,6 +143,13 @@ const QuizQuestion = ({
             eliminateTwoWrongAnswers();
             BadgeManager.onHintUsed();
         }
+    };
+    
+    const eliminateTwoWrongAnswers = () => {
+        const wrong = question.answers.map((ans, idx) => ({ ans, idx })).filter((x) => x.ans !== question.correct_answer);
+        const shuffled = [...wrong].sort(() => Math.random() - 0.5);
+        const toRemove = shuffled.slice(0, Math.min(2, wrong.length)).map((x) => x.idx);
+        setEliminatedIndices(new Set(toRemove));
     };
 
     const getHintText = () => {
@@ -176,7 +162,6 @@ const QuizQuestion = ({
         return "";
     };
 
-    // Bookmark toggle
     const handleBookmarkToggle = () => {
         const result = BookmarkManager.toggleBookmark(question);
         if (result.success) {
@@ -187,13 +172,10 @@ const QuizQuestion = ({
         }
     };
 
-    // Speak result
     useEffect(() => {
         if (showResult && question && !hasResultBeenAnnounced) {
             const isCorrect = selectedAnswer === question.correct_answer;
-            const correctIndex = question.answers.indexOf(
-                question.correct_answer,
-            );
+            const correctIndex = question.answers.indexOf(question.correct_answer);
             const correctOption = String.fromCharCode(65 + correctIndex);
 
             let resultText = "";
@@ -212,70 +194,34 @@ const QuizQuestion = ({
                 if (onResultAnnounced) onResultAnnounced();
             });
         }
-    }, [
-        showResult,
-        selectedAnswer,
-        isTimedOut,
-        question,
-        hasResultBeenAnnounced,
-        speak,
-        onResultAnnounced
-    ]);
+    }, [showResult, selectedAnswer, isTimedOut, question, hasResultBeenAnnounced, speak, onResultAnnounced]);
 
-    // Button classes
     const getButtonClass = (answer) => {
-        const base =
-            "w-full p-4 text-left rounded-lg font-medium transition-all duration-300 transform ";
+        const base = "w-full p-4 text-left rounded-lg font-medium transition-all duration-300 transform ";
         if (!selectedAnswer && !clickedAnswer && !isTimedOut) {
-            return (
-                base +
-                "bg-white hover:bg-purple-50 hover:scale-105 hover:shadow-lg text-gray-800 border-2 border-transparent hover:border-purple-300"
-            );
+            return base + "bg-white dark:bg-gray-700 hover:bg-purple-50 dark:hover:bg-gray-600 hover:scale-105 hover:shadow-lg text-gray-800 dark:text-gray-200 border-2 border-transparent hover:border-purple-300";
         }
         if (selectedAnswer || clickedAnswer || isTimedOut) {
             if (answer === question.correct_answer)
-                return (
-                    base +
-                    "bg-green-500 text-white border-2 border-green-600 scale-105 shadow-lg"
-                );
+                return base + "bg-green-500 text-white border-2 border-green-600 scale-105 shadow-lg";
             if (answer === (selectedAnswer || clickedAnswer))
-                return (
-                    base +
-                    "bg-red-500 text-white border-2 border-red-600 scale-105 shadow-lg"
-                );
-            return base + "bg-gray-300 text-gray-600 border-2 border-gray-400";
+                return base + "bg-red-500 text-white border-2 border-red-600 scale-105 shadow-lg";
+            return base + "bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400 border-2 border-gray-400";
         }
         return base;
     };
 
     const getAnswerIcon = (answer) => {
         if (!selectedAnswer && !clickedAnswer && !isTimedOut) return null;
-        if (answer === question.correct_answer)
-            return <span className="text-2xl">✓</span>;
-        if (answer === (selectedAnswer || clickedAnswer))
-            return <span className="text-2xl">✗</span>;
+        if (answer === question.correct_answer) return <span className="text-2xl">✓</span>;
+        if (answer === (selectedAnswer || clickedAnswer)) return <span className="text-2xl">✗</span>;
         return null;
-    };
-
-    const eliminateTwoWrongAnswers = () => {
-        const wrong = question.answers
-            .map((ans, idx) => ({ ans, idx }))
-            .filter((x) => x.ans !== question.correct_answer);
-        const shuffled = [...wrong].sort(() => Math.random() - 0.5);
-        const toRemove = shuffled
-            .slice(0, Math.min(2, wrong.length))
-            .map((x) => x.idx);
-        setEliminatedIndices(new Set(toRemove));
     };
     
     return (
         <>
-            <div
-                className="bg-white rounded-xl shadow-2xl p-8 max-w-3xl mx-auto relative"
-                data-quiz-question="true"
-            >
-                {/* Voice Controls */}
-                <div className="absolute top-4 right-4 z-10">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-8 max-w-3xl mx-auto relative" data-quiz-question="true">
+                <div className="absolute top-4 right-4 z-10 no-print">
                     <VoiceControls
                         question={question}
                         onAnswerSelect={handleAnswerClick}
@@ -293,157 +239,101 @@ const QuizQuestion = ({
                         setTranscript={setTranscript}
                         isTimedOut={isTimedOut}
                         showResult={showResult}
+                        isAnnouncingResult={isAnnouncingResult}
                     />
                 </div>
 
-                {/* Header */}
                 <div className="mb-8 pr-48 flex justify-between items-start">
                     <div>
                         <div className="flex items-center gap-3 mb-4">
-                            <div className="bg-purple-100 p-2 rounded-lg">
+                            <div className="bg-purple-100 dark:bg-purple-900/50 p-2 rounded-lg">
                                 <span className="text-2xl">🤔</span>
                             </div>
-                            <span className="text-sm font-semibold text-purple-600 uppercase tracking-wide">
-                                {question.category}
-                            </span>
+                            <span className="text-sm font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wide">{question.category}</span>
                         </div>
-                        <h2 className="text-2xl md:text-3xl font-bold text-gray-800 leading-relaxed">
-                            {question.question}
-                        </h2>
+                        <h2 className="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white leading-relaxed">{question.question}</h2>
 
-                        {/* Badges */}
                         <div className="flex items-center gap-2 mt-4 flex-wrap">
-                            <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+                            <span className="bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300 px-3 py-1 rounded-full text-sm font-medium">
                                 {question.difficulty}
                             </span>
-                            <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                            <span className="bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 px-3 py-1 rounded-full text-sm font-medium">
                                 {question.type}
                             </span>
                             {isTimerEnabled && (
-                                <span className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm font-medium">
+                                <span className="bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300 px-3 py-1 rounded-full text-sm font-medium">
                                     ⏱️ Timed
                                 </span>
                             )}
                             {isAnnouncingResult && (
-                                <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium animate-pulse">
-                                    🔊 Announcing Result...
+                                <span className="bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300 px-3 py-1 rounded-full text-sm font-medium animate-pulse">
+                                    🔊 Announcing...
                                 </span>
                             )}
                         </div>
                     </div>
 
-                    {/* Bookmark and Hint */}
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-center no-print">
                         <button
                             onClick={handleHintRequest}
-                            disabled={
-                                hintsUsed >= 1 ||
-                                hintsRemaining <= 0 ||
-                                selectedAnswer ||
-                                clickedAnswer ||
-                                isTimedOut ||
-                                question.answers.length <= 2
-                            }
+                            disabled={hintsUsed >= 1 || hintsRemaining <= 0 || selectedAnswer || clickedAnswer || isTimedOut || question.answers.length <= 2}
                             className={`p-2 rounded-lg transition-all duration-300 hover:scale-110 ${
-                                hintsUsed >= 1 ||
-                                hintsRemaining <= 0 ||
-                                selectedAnswer ||
-                                clickedAnswer ||
-                                isTimedOut ||
-                                question.answers.length <= 2
-                                    ? "text-gray-300 cursor-not-allowed"
+                                hintsUsed >= 1 || hintsRemaining <= 0 || selectedAnswer || clickedAnswer || isTimedOut || question.answers.length <= 2
+                                    ? "text-gray-300 dark:text-gray-600 cursor-not-allowed"
                                     : "text-yellow-500 hover:text-yellow-600"
                             }`}
-                            title={
-                                hintsRemaining <= 0
-                                    ? "No hints remaining"
-                                    : "Use 50/50 hint"
-                            }
+                            title={hintsRemaining <= 0 ? "No hints remaining" : "Use 50/50 hint"}
                             aria-label="Use 50/50 hint"
                         >
-                            <svg
-                                className="w-6 h-6 transition-all duration-300"
-                                fill="currentColor"
-                                viewBox="0 0 20 20"
-                            >
-                                <path
-                                    fillRule="evenodd"
-                                    d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z"
-                                    clipRule="evenodd"
-                                />
+                            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
                             </svg>
                         </button>
 
-                        <div
-                            className="px-2 py-1 rounded-md text-sm font-semibold bg-yellow-100 text-yellow-800"
-                            aria-live="polite"
-                        >
+                        <div className="px-2 py-1 rounded-md text-sm font-semibold bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300" aria-live="polite">
                             {hintsRemaining} left
                         </div>
 
                         <button
                             onClick={handleBookmarkToggle}
-                            className={`p-2 rounded-lg transition-all duration-300 hover:scale-110 ${isBookmarked ? "text-orange-500 hover:text-orange-600" : "text-gray-400 hover:text-orange-500"}`}
-                            title={
-                                isBookmarked
-                                    ? "Remove bookmark"
-                                    : "Bookmark this question"
-                            }
+                            className={`p-2 rounded-lg transition-all duration-300 hover:scale-110 ${isBookmarked ? "text-orange-500 hover:text-orange-600" : "text-gray-400 dark:text-gray-500 hover:text-orange-500"}`}
+                            title={isBookmarked ? "Remove bookmark" : "Bookmark this question"}
                         >
-                            <svg
-                                className="w-6 h-6 transition-all duration-300"
-                                fill={isBookmarked ? "currentColor" : "none"}
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
-                                />
+                            <svg className="w-6 h-6" fill={isBookmarked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
                             </svg>
                         </button>
                     </div>
                 </div>
 
-                {/* Hint Display */}
                 {showHint && (
-                    <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg animate-fadeInUp">
+                    <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/50 rounded-lg animate-fadeInUp">
                         <div className="flex items-center gap-2 mb-2">
-                            <div className="text-yellow-600">💡</div>
-                            <span className="font-semibold text-yellow-800">
-                                Hint:
-                            </span>
+                            <div className="text-yellow-600 dark:text-yellow-400">💡</div>
+                            <span className="font-semibold text-yellow-800 dark:text-yellow-200">Hint:</span>
                         </div>
-                        <p className="text-yellow-700">{getHintText()}</p>
+                        <p className="text-yellow-700 dark:text-yellow-300">{getHintText()}</p>
                     </div>
                 )}
 
-                {/* Answers */}
                 <div className="space-y-4">
                     {shuffledIndices.map((originalIndex, displayPosition) => {
                         const answer = question.answers[originalIndex];
-                        const isEliminated =
-                            eliminatedIndices.has(originalIndex);
+                        // If the answer is undefined or null (can happen with faulty API data for T/F), don't render the button.
+                        if (answer == null) return null; 
+
+                        const isEliminated = eliminatedIndices.has(originalIndex);
                         return (
                             <button
                                 key={`${originalIndex}-${displayPosition}`}
                                 onClick={() => handleAnswerClick(answer)}
-                                disabled={
-                                    selectedAnswer ||
-                                    clickedAnswer ||
-                                    isTimedOut ||
-                                    isAnnouncingResult ||
-                                    isEliminated ||
-                                    isShuffling
-                                }
+                                disabled={selectedAnswer || clickedAnswer || isTimedOut || isAnnouncingResult || isEliminated || isShuffling}
                                 className={`${getButtonClass(answer)} ${
                                     isEliminated
-                                        ? "opacity-0 scale-95 pointer-events-none h-0 py-0 my-0 overflow-hidden transition-all duration-300"
+                                        ? "opacity-0 scale-95 pointer-events-none h-0 py-0 my-0 overflow-hidden"
                                         : isShuffling
-                                        ? "transition-all duration-200 transform scale-98 opacity-80"
-                                        : "transition-all duration-300 transform scale-100 opacity-100"
+                                        ? "transition-transform duration-200 scale-98 opacity-80"
+                                        : "transition-transform duration-300 scale-100 opacity-100"
                                 }`}
                                 data-quiz-answer="true"
                                 data-answer-index={originalIndex}
@@ -451,20 +341,10 @@ const QuizQuestion = ({
                             >
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
-                                        <div
-                                            className={`flex-shrink-0 w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-bold transition-all duration-200 ${
-                                                isShuffling
-                                                    ? "animate-pulse"
-                                                    : ""
-                                            }`}
-                                        >
-                                            {String.fromCharCode(
-                                                65 + displayPosition,
-                                            )}
+                                        <div className={`flex-shrink-0 w-8 h-8 bg-purple-100 dark:bg-purple-900/50 rounded-full flex items-center justify-center text-purple-600 dark:text-purple-300 font-bold transition-transform duration-200 ${isShuffling ? "animate-pulse" : ""}`}>
+                                            {String.fromCharCode(65 + displayPosition)}
                                         </div>
-                                        <span className="text-lg">
-                                            {answer}
-                                        </span>
+                                        <span className="text-lg">{answer}</span>
                                     </div>
                                     {getAnswerIcon(answer)}
                                 </div>
@@ -473,32 +353,26 @@ const QuizQuestion = ({
                     })}
                 </div>
 
-                {/* Result */}
                 {(selectedAnswer || clickedAnswer || isTimedOut) && (
-                    <div className="mt-6 p-4 rounded-lg bg-gray-50">
+                    <div className="mt-6 p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50">
                         <div className="flex items-center gap-2 flex-wrap">
                             {isTimedOut && !selectedAnswer && !clickedAnswer ? (
                                 <>
                                     <span className="text-2xl">⏱️</span>
-                                    <span className="text-orange-600 font-semibold text-lg">
-                                        Time's up! The correct answer was:{" "}
-                                        {question.correct_answer}
+                                    <span className="text-orange-600 dark:text-orange-400 font-semibold text-lg">
+                                        Time's up! Correct answer: {question.correct_answer}
                                     </span>
                                 </>
-                            ) : (selectedAnswer || clickedAnswer) ===
-                              question.correct_answer ? (
+                            ) : (selectedAnswer || clickedAnswer) === question.correct_answer ? (
                                 <>
                                     <span className="text-2xl">🎉</span>
-                                    <span className="text-green-600 font-semibold text-lg">
-                                        Correct!
-                                    </span>
+                                    <span className="text-green-600 dark:text-green-400 font-semibold text-lg">Correct!</span>
                                 </>
                             ) : (
                                 <>
                                     <span className="text-2xl">😔</span>
-                                    <span className="text-red-600 font-semibold text-lg">
-                                        Incorrect. The correct answer is:{" "}
-                                        {question.correct_answer}
+                                    <span className="text-red-600 dark:text-red-400 font-semibold text-lg">
+                                        Incorrect. Correct answer: {question.correct_answer}
                                     </span>
                                 </>
                             )}
@@ -507,7 +381,6 @@ const QuizQuestion = ({
                 )}
             </div>
 
-            {/* Voice Settings Modal */}
             <VoiceSettings
                 isOpen={isSettingsOpen}
                 onClose={() => setIsSettingsOpen(false)}
