@@ -359,7 +359,7 @@ const QuizApp = () => {
                   hintsUsed: totalHintsUsed,
                   timeSpent: totalTimeSpent,
                 },
-              })
+              }),
             );
           } catch (error) {
             console.warn("Failed to save quiz stats:", error);
